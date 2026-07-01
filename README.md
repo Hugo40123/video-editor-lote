@@ -1,204 +1,288 @@
-# Editor de Videos em Lote
+# VideoEditorLote v2.5.0
 
-Software desktop em Python para Windows que edita varios videos usando FFmpeg.
+**Editor de Vídeos em Lote** — Ferramenta de operação para afiliados.
 
-O programa gera videos verticais em 1080x1920, aplica uma imagem de fundo, opcionalmente adiciona logo/marca d'agua, textos superior e inferior, marca em texto translucida no centro, mascara para ocultar @ central, e salva tudo em MP4 com H.264.
+Pipeline completo: upload → edição FFmpeg → legenda com IA → agendamento → publicação Instagram.
 
-## Estrutura
+---
 
-```text
-video_editor_lote/
-|-- main.py
-|-- requirements.txt
-|-- README.md
-|-- app/
-|   |-- __init__.py
-|   |-- interface.py
-|   |-- video_processor.py
-|   `-- utils.py
-|-- entrada/
-|-- saida/
-`-- assets/
-    |-- fundo_padrao.jpg
-    `-- logo_padrao.png
-```
+## 🐘 v2.5 — PostgreSQL
 
-## Como instalar o Python no Windows
+O banco de dados agora suporta **SQLite (desenvolvimento)** e **PostgreSQL (produção)** via `DATABASE_URL`.
 
-1. Acesse https://www.python.org/downloads/windows/
-2. Baixe a versao mais recente do Python 3.
-3. Durante a instalacao, marque a opcao **Add Python to PATH**.
-4. Depois de instalar, abra o Prompt de Comando ou PowerShell e confira:
+- **Dev:** `DATABASE_URL` vazia/não configurada → SQLite local (`config/app.db`)
+- **Prod:** `DATABASE_URL=postgresql://user:pass@host:5432/dbname` → PostgreSQL
 
-```powershell
-python --version
-```
+```bash
+# Windows (CMD)
+set DATABASE_URL=postgresql://user:pass@localhost:5432/videoeditor
+python main.py
 
-## Como instalar o FFmpeg no Windows
-
-Opcao simples usando Winget:
-
-```powershell
-winget install Gyan.FFmpeg
-```
-
-Depois feche e abra novamente o terminal. Confirme:
-
-```powershell
-ffmpeg -version
-```
-
-Se preferir instalar manualmente:
-
-1. Baixe uma build do FFmpeg em https://www.gyan.dev/ffmpeg/builds/
-2. Extraia o arquivo ZIP.
-3. Adicione a pasta `bin` do FFmpeg ao PATH do Windows.
-4. Abra um novo terminal e rode `ffmpeg -version`.
-
-## Como instalar as dependencias
-
-Entre na pasta do projeto:
-
-```powershell
-cd "C:\Users\Hugo\Documents\APP CRIAÇÃO VIDEO\video_editor_lote"
-```
-
-Crie um ambiente virtual:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-```
-
-Instale as bibliotecas:
-
-```powershell
-pip install -r requirements.txt
-```
-
-## Como rodar
-
-Com o ambiente virtual ativo:
-
-```powershell
+# Windows (PowerShell)
+$env:DATABASE_URL="postgresql://user:pass@localhost:5432/videoeditor"
 python main.py
 ```
 
-Na interface:
+### Migração de dados SQLite → PostgreSQL
 
-1. Selecione a pasta com os videos de entrada.
-2. Escolha a imagem de fundo.
-3. Escolha a logo, caso queira aplicar marca d'agua.
-4. Escolha a pasta de saida.
-5. Preencha os textos e a duracao maxima, se quiser.
-6. Escolha o template.
-7. Marque **Incluir subpastas** se quiser buscar videos dentro das pastas internas.
-8. Use **Ajuste do video** para mudar tamanho e posicao do video com barras.
-9. Se quiser ocultar um @ no centro, marque **Ocultar @ central** e mova a area com as barras.
-10. Se quiser usar seu @ em texto, marque **Aplicar meu @ no centro**, preencha o campo e ajuste posicao/tamanho com as barras.
-11. Clique em **Gerar videos**.
+```bash
+# 1. Configure a conexão PostgreSQL
+set DATABASE_URL=postgresql://user:pass@host:5432/dbname
 
-Formatos de entrada aceitos: `.mp4`, `.mov`, `.avi` e `.mkv`.
+# 2. Execute a migração
+python scripts/migrate_to_postgresql.py
+```
 
-Quando **Incluir subpastas** estiver ativo, o programa procura videos em todos os niveis abaixo da pasta de entrada. Se dois arquivos tiverem o mesmo nome em subpastas diferentes, o programa evita sobrescrever a saida adicionando um numero ao final, como `_2`.
+### Backup
 
-## Configuracoes salvas
+```bash
+python scripts/backup_sqlite.py              # Backup padrão
+python scripts/backup_sqlite.py --output .    # Pasta específica
+python scripts/backup_sqlite.py --list        # Listar backups
+```
 
-O app salva automaticamente as ultimas informacoes usadas, como:
+---
 
-- pasta de entrada e saida;
-- imagem de fundo e logo;
-- template;
-- textos;
-- @, tamanho e posicao;
-- ajuste de tamanho/posicao do video;
-- opcao de incluir subpastas;
-- area de ocultar @ central.
+## ⚡ Funcionalidades
 
-Quando usado como `.exe`, essas informacoes ficam em `config/settings.json` ao lado do executavel.
+### ✅ Upload
+- Arraste vídeos (max 10, 500MB cada) para upload multipart
+- Upload opcional de fundo e logo (fallback para assets padrão)
+- Preview canvas em tempo real com ajustes de posição
 
-## Templates
+### ✅ Edição FFmpeg em lote
+- 3 templates de layout vertical (1080x1920)
+- Máscara delogo para ocultar marca d'água central
+- Sobreposição de @ translúcido com ajuste de posição/tamanho
+- Logo no canto inferior direito
+- Ajuste de tamanho, largura, posição horizontal e vertical
+- Corte por duração máxima
+- Download dos vídeos processados (`/output/{filename}`)
 
-**Template 1:** video centralizado sobre fundo, largura maxima de 900 px, logo no canto inferior direito e textos opcionais.
+### ✅ Geração de conteúdo com IA
+- **Google Gemini** — transcreve o áudio e gera legenda estilo publi em 1 chamada
+- **Fallback local** — rascunho rápido baseado no nome do arquivo
+- Editor de legenda completo: título, CTA, hashtags, product query, link afiliado
+- Fluxo: gerar → revisar → aprovar
 
-**Template 2:** video maior, largura maxima de 1000 px, com logo e texto inferior opcional.
+### ✅ Agendamento automático (Scheduler)
+- Worker daemon em background verificando a cada 30s
+- Publica posts no horário agendado
+- Retry com backoff exponencial (5min → 10min → 20min, máx 3)
+- Lock anti-duplicação (worker_lock com timeout 10min)
+- Botões ▶ Iniciar / ⏹ Parar na interface
+- Reset de posts travados em PROCESSANDO
 
-**Template 3:** video centralizado com faixas escuras semitransparentes no topo e no rodape para textos.
+### ✅ Publicação no Instagram
+- API Graph v25.0 com upload resumable
+- Suporte a REELS com share_to_feed
+- Polling de status do container
+- Publicação manual e automática (compartilha o mesmo publisher)
 
-## Configuracoes de exportacao
+### ✅ Busca de Produtos (v2.4)
+- **Mercado Livre** — scraping HTML + extração JSON
+- **Shopee** — API interna + fallback via Google
+- Geração de link de afiliado (ML Cliques + Shopee Affiliate)
+- Associação produto ↔ post na fila
+- Interface completa com thumbnails, preços e seleção
 
-- Resolucao: 1080x1920
-- Video: `libx264`
-- Audio: `aac`
-- Preset: `veryfast`
-- CRF: `23`
-- Pixel format: `yuv420p`
-- Nome de saida: nome original + `_editado.mp4`
+### ✅ Histórico e Logs
+- Tabela `worker_logs` com nível (INFO/ERROR) e referência ao post
+- Tabela `batch_history` registrando lotes de processamento
+- Tabela `content_history` com histórico de legendas geradas
+- Limpeza de logs antigos via API
 
-Se o video nao tiver audio, ele sera gerado normalmente.
+### ✅ Configurações
+- Salvamento automático a cada 30s
+- DB (SQLite) + JSON legacy como fallback
+- Aba dedicada: Gemini, Instagram, sistema, status da fila
 
-## Ajuste do video com barras
+### ✅ API REST completa
+~40 endpoints documentados via Swagger em `/docs`.
 
-A area **Ajuste do video** permite melhorar o enquadramento antes de gerar:
+---
 
-- **Tamanho:** aumenta ou diminui o video dentro do layout.
-- **Largura:** estica ou comprime o video apenas na horizontal, sem aumentar a altura junto.
-- **Horizontal:** move o video para a esquerda ou direita.
-- **Vertical:** move o video para cima ou baixo.
-- **Centralizar video:** volta para tamanho `100%`, largura `100%` e posicao central.
+## 🚀 Como rodar
 
-A previa mostra o enquadramento aproximado conforme as barras sao movidas.
-
-## Ocultar marca central e aplicar seu @
-
-A opcao **Ocultar @ central** usa o filtro `delogo` do FFmpeg para suavizar uma area retangular no video final. A posicao da area e ajustada com barras:
-
-- **Horizontal:** move a area para a esquerda ou direita.
-- **Vertical:** move a area para cima ou baixo.
-- `Largura`: largura da area.
-- `Altura`: altura da area.
-
-O padrao de posicao horizontal/vertical, largura `700` e altura `160` cobre uma faixa central comum. Ajuste pelas barras se o @ estiver mais alto, mais baixo ou maior.
-
-A opcao **Aplicar meu @ no centro** escreve uma marca em texto translucida no centro do video, sem precisar de arquivo de logo.
-
-O campo **Tamanho do @** controla o tamanho da fonte dessa marca central. Use valores menores, como `40` ou `50`, para uma marca mais discreta; o valor padrao e `76`.
-
-As barras **Horizontal @** e **Vertical @** movem a marca em texto para a esquerda, direita, cima ou baixo. Use **Centralizar @** para voltar a marca ao centro.
-
-A area **Previa da marca** mostra uma miniatura vertical do resultado, incluindo:
-
-- o espaco aproximado do video dentro do template;
-- a area que sera suavizada quando **Ocultar @ central** estiver ativo;
-- a logo no canto inferior direito, quando **Aplicar logo** estiver ativo;
-- o seu @ translucido no centro, quando **Aplicar meu @ no centro** estiver ativo.
-
-Use essas opcoes apenas em videos que voce tem direito de editar e republicar.
-
-## Gerar .exe com PyInstaller
-
-Primeiro instale as dependencias:
-
-```powershell
+```bash
+cd "C:\Users\Windows\Documents\VIDEO EDITOR LOTE"
 pip install -r requirements.txt
+python main.py
+# → http://localhost:5000
+# → Swagger: http://localhost:5000/docs
 ```
 
-Comando simples:
+### Dependências principais
+- Python 3.10+
+- FFmpeg (no PATH)
+- FastAPI + Uvicorn
+- Google Gemini API key (opcional, para IA)
+- Instagram Access Token (opcional, para publicação)
 
-```powershell
-pyinstaller --noconfirm --onefile --windowed main.py
+---
+
+## 📁 Estrutura
+
+```
+video_editor_lote/
+│
+├── main.py                     # Inicia servidor web (FastAPI + uvicorn)
+├── requirements.txt
+├── README.md
+├── RESUMO_PARA_CONTINUAR.md    # Estado do projeto e roadmap
+│
+├── uploads/                    # Uploads de vídeos e imagens
+├── saida/                      # Vídeos processados (/output/)
+├── assets/                     # fundo_padrao.jpg, logo_padrao.png
+├── config/                     # app.db, settings.json
+│
+├── app/                        # Core
+│   ├── database.py             # SQLite + migrations
+│   ├── repository.py           # CRUD
+│   ├── utils.py                # FFmpeg, paths, config
+│   ├── video_processor.py      # FFmpeg pipeline
+│   ├── gemini_content.py       # Google Gemini API
+│   ├── free_ai_content.py      # Gemini + fallback local
+│   ├── content_generator.py    # Rascunho local
+│   ├── instagram_api.py        # Cliente Instagram Graph API
+│   ├── product_search.py       # Busca ML + Shopee
+│   └── workers/
+│       ├── scheduler.py        # Daemon de publicação
+│       ├── publisher.py        # Lógica reutilizável de publicação
+│       └── retry.py            # Backoff e reset
+│
+├── web/                        # Interface web
+│   ├── server.py               # FastAPI (lifespan, rotas, health)
+│   └── routes/
+│       ├── editor.py           # Upload, edição, processamento
+│       ├── content.py          # Geração de conteúdo
+│       ├── posts.py            # Fila, scheduler, logs
+│       ├── products.py         # Busca de produtos
+│       └── settings.py         # Configurações
+│
+├── templates/
+│   └── index.html              # Interface completa
+└── static/
+    ├── css/app.css             # Tema dark
+    └── js/app.js               # Lógica frontend
 ```
 
-Comando incluindo os assets padrao:
+---
 
-```powershell
-pyinstaller --noconfirm --onefile --windowed --add-data "assets;assets" main.py
+## 🔄 Pipeline completo
+
+```
+PASSO 1 ──── UPLOAD + EDIÇÃO ──────────────────
+  • Arrasta vídeos (max 10)
+  • Fundo/logo opcionais
+  • Configura template, máscara, @, posição
+  • "Gerar vídeos" → FFmpeg → /saida/
+  • Download em /output/{filename}
+
+PASSO 2 ──── GERAÇÃO DE CONTEÚDO ──────────────
+  • Aba "Conteúdo" → fila de vídeos
+  • "Gerar com Gemini" → transcrição + legenda
+  • Revisa → "Aprovar"
+
+PASSO 3 ──── BUSCAR PRODUTO ───────────────────
+  • Aba "Produtos" → busca ML/Shopee
+  • Seleciona produto
+  • Gera link de afiliado
+  • Vincula ao post
+
+PASSO 4 ──── AGENDAR E PUBLICAR ───────────────
+  • Aba "Postagens" → fila com status
+  • Define data/hora → AGENDADO
+  • Scheduler automático publica no horário
+  • Ou "Publicar agora" manual
+  • Retry automático em caso de erro
 ```
 
-O executavel ficara dentro da pasta `dist`.
+---
 
-## Observacoes
+## 📊 Roadmap
 
-- O FFmpeg precisa estar instalado e disponivel no PATH.
-- Os comandos FFmpeg sao executados de forma local usando `subprocess`.
-- Nao ha banco de dados, login, internet ou integracao com redes sociais.
+### ✅ Concluído (v2.0 → v2.5)
+
+**Upload e Edição:**
+- [x] Upload drag & drop (max 10, 500MB)
+- [x] Três templates de layout vertical
+- [x] Máscara delogo para ocultar marca d'água
+- [x] Sobreposição de @ translúcido
+- [x] Logo personalizada no canto inferior
+- [x] Ajuste de tamanho, largura e posição
+- [x] Preview canvas em tempo real
+- [x] Download de vídeos processados
+
+**Conteúdo e IA:**
+- [x] Google Gemini como única IA (transcrição + legenda)
+- [x] Fallback local (rascunho rápido)
+- [x] Editor de legenda completo
+- [x] Aprovação de conteúdo
+- [x] Histórico de conteúdo gerado
+
+**Scheduler e Publicação:**
+- [x] Scheduler automático (daemon 30s)
+- [x] Retry com backoff exponencial (máx 3)
+- [x] Lock anti-duplicação (worker_lock)
+- [x] Publisher reutilizável (scheduler + manual)
+- [x] Publicação Instagram (Graph API v25.0)
+
+**Logs e Histórico:**
+- [x] Worker logs
+- [x] Batch history
+- [x] Content history
+- [x] Limpeza de logs antigos
+
+**Produtos (v2.4):**
+- [x] Busca Mercado Livre (scraping HTML + JSON)
+- [x] Busca Shopee (API + Google fallback)
+- [x] Geração de link de afiliado
+- [x] Associação produto ↔ post
+
+**PostgreSQL (v2.5):**
+- [x] SQLAlchemy ORM para todos os modelos
+- [x] SQLite (dev) + PostgreSQL (prod) via DATABASE_URL
+- [x] Alembic com migrations
+- [x] Tabelas users + accounts
+- [x] Script de migração SQLite → PostgreSQL
+- [x] Script de backup do banco
+
+**Sistema:**
+- [x] Health check (FFmpeg, Gemini, Instagram)
+- [x] Configurações salvas automaticamente (30s)
+- [x] Dark theme responsivo
+- [x] ~40 endpoints REST documentados
+
+### 🔄 Próximos passos
+1. **Storage remoto** — Cloudflare R2 / Supabase (v2.6)
+2. **Autenticação** — Login, JWT, roles (v2.7)
+3. **Testes automatizados** — Unit tests para módulos core (v2.8)
+4. **Observabilidade** — Métricas, dashboard
+5. **Segurança** — Rate limiting, CORS
+6. **Melhorias** — Export CSV, duplicar post, paginação
+
+---
+
+## 🔧 Observações
+
+- FFmpeg precisa estar instalado e no PATH
+- Google Gemini: tier gratuito 1.500 req/dia (modelo Flash)
+- Instagram: requer token de acesso do Meta (Graph API v25.0)
+- Dados salvos em SQLite local (`config/app.db`)
+- Sem autenticação — app aberto na rede local
+
+---
+
+## 📖 Como obter credenciais
+
+### Google Gemini
+1. Acesse [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+2. Crie uma chave de API (começa com `AIza...`)
+3. Configure na aba Configurações > Google Gemini
+
+### Instagram
+1. Crie um app no [developers.facebook.com](https://developers.facebook.com)
+2. Configure o Instagram Basic Display / Graph API
+3. Obtenha o IG User ID e Access Token
+4. Configure na aba Configurações > Instagram

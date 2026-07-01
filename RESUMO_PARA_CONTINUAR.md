@@ -1,15 +1,15 @@
 # Resumo para continuar o projeto
 
-**Data do resumo:** 2026-06-30 (atualizado v2.3)
+**Data do resumo:** 2026-07-01 (atualizado v2.5)
 
 **Projeto:** `VideoEditorLote`
 
 **Pasta principal:**
 ```
-C:\Users\Hugo\Documents\APP CRIAÇÃO VIDEO\video_editor_lote
+C:\Users\Windows\Documents\VIDEO EDITOR LOTE
 ```
 
-**Versão atual:** 2.3.0 — Web App (FastAPI + SQLite + Gemini API + Scheduler)
+**Versão atual:** 2.5.0 — Web App (FastAPI + SQLAlchemy + Alembic + Gemini + Scheduler + Busca Produtos + PostgreSQL)
 
 ---
 
@@ -20,73 +20,66 @@ Automatizar uma esteira de perfis de afiliados:
 1. ✅ **Editar vídeos em lote** — FFmpeg aplica fundo, logo, oculta marca d'água
 2. ✅ **Gerar conteúdo de post automaticamente** — Google Gemini transcreve + cria legenda publi
 3. ✅ **Scheduler de postagem automática** — Worker em background com retry e lock anti-duplicação
-4. 🔄 **Buscar produtos e links de afiliado** — PRÓXIMO GRANDE PASSO (v2.4)
-5. 🔄 **Migrar SQLite → PostgreSQL** — Preparar para produção (v2.5)
-6. ⏳ **Storage remoto (R2/Supabase)** — Futuro (v2.6)
-
-**Filosofia:** Não é só um editor de vídeo. É uma ferramenta de operação para afiliados:
-reduzir trabalho repetitivo, padronizar conteúdo e acelerar a criação de perfis de achadinhos.
+4. ✅ **Buscar produtos e links de afiliado** — Mercado Livre + Shopee + links de afiliado
+5. ✅ **Migrar SQLite → PostgreSQL** — SQLAlchemy ORM + Alembic + DATABASE_URL (concluído v2.5)
+6. 🔄 **Storage remoto (R2/Supabase)** — Futuro (v2.6)
 
 ---
 
-## 📋 Estado atual do app (v2.3)
+## 📋 Estado do App (v2.5)
 
-### ✅ Mudanças recentes (v2.3 — Scheduler)
+### ✅ O que já foi implementado
 
-| Mudança | Detalhes |
-|---|---|
-| **Scheduler automático** | Worker daemon em background que publica posts agendados. |
-| **Retry com backoff** | 3 tentativas com delay exponencial (5min → 10min → 20min). |
-| **Lock anti-duplicação** | Coluna `worker_lock` com timeout de 10min para evitar publicação duplicada. |
-| **Novos status** | `PENDENTE` → `AGENDADO` → `PROCESSANDO` → `PUBLICADO` / `ERRO` |
-| **Migração automática** | Status antigos (`Pronto`, `Agendado`, `Postado`) convertidos na inicialização. |
-| **Worker logs** | Nova tabela `worker_logs` com nível (INFO/ERROR) e referência ao post. |
-| **Batch history** | Nova tabela `batch_history` registrando cada lote de processamento. |
-| **Publisher reutilizável** | `app/workers/publisher.py` — usado tanto pelo scheduler quanto pelo botão manual. |
-| **Health check aprimorado** | `GET /api/health` agora verifica FFmpeg, Gemini e Instagram. |
-| **google-genai no requirements** | `google-genai>=1.0.0` adicionado. |
-| **Botão duplicar legenda** | Adiciona bloco extra na aba Postagens. |
-| **Scheduler control** | Botões ▶ Iniciar / ⏹ Parar na interface. |
-| **Datetime-local** | Campo de agendamento mudado para `<input type="datetime-local">`. |
-| **Retry count visível** | Mostra número de tentativas no detalhe do post. |
+| Funcionalidade | Status | Detalhes |
+|---|---|---|
+| **Upload drag & drop** | ✅ Completo | Max 10 vídeos, 500MB cada, multipart, preview |
+| **Edição FFmpeg em lote** | ✅ Completo | 3 templates, delogo, @, logo, posição, duração |
+| **Geração legenda (Gemini)** | ✅ Completo | Upload → transcrição → legenda em 1 chamada |
+| **Geração legenda (Local)** | ✅ Completo | Rascunho rápido por nome + keywords (fallback) |
+| **Scheduler automático** | ✅ Completo | Daemon 30s, retry backoff, lock anti-duplicação |
+| **Publisher reutilizável** | ✅ Completo | Compartilhado scheduler + manual |
+| **Publicação Instagram** | ✅ Completo | API v25.0, Reels, resumable upload |
+| **Worker logs** | ✅ Completo | Tabela + API + interface |
+| **Batch history** | ✅ Completo | Tabela + API + interface |
+| **Content history** | ✅ Completo | Tabela + API |
+| **Configurações (Settings)** | ✅ Completo | DB + JSON, auto-save 30s |
+| **Health check** | ✅ Completo | FFmpeg, Gemini, Instagram |
+| **Busca Mercado Livre** | ✅ Completo | Scraping HTML + JSON |
+| **Busca Shopee** | ✅ Completo | API + fallback Google |
+| **Links de afiliado** | ✅ Completo | ML Cliques + Shopee Affiliate |
+| **Associação produto ↔ post** | ✅ Completo | Tabela products, seleção, vinculação |
+| **Interface web** | ✅ Completo | 5 abas, dark theme, responsiva |
+| **API REST** | ✅ Completo | ~40 endpoints, Swagger em /docs |
+| **Migrações automáticas DB** | ✅ Completo | Idempotente, status antigos → novos |
 
-### ✅ Mudanças anteriores (v2.2 — Upload)
+### ✅ v2.5 — PostgreSQL Migration
 
-| Mudança | Detalhes |
-|---|---|
-| **Drag & drop upload** | Substitui seletor de pastas nativo. |
-| **Upload de vídeos** | Multipart, max 10 arquivos, 500MB cada. |
-| **Upload de imagens** | Fundo e logo opcionais, fallback para defaults. |
-| **Download de saída** | `GET /output/{filename}` para baixar vídeos processados. |
-| **Seletor nativo removido** | Endpoints `select-folder` e `select-file` removidos. |
-| **Servir arquivos** | `GET /uploads/{session}/{file}` com proteção path traversal. |
+| Funcionalidade | Status | Detalhes |
+|---|---|---|
+| SQLAlchemy ORM | ✅ Completo | Todos os modelos mapeados |
+| DATABASE_URL | ✅ Completo | SQLite (dev) / PostgreSQL (prod) |
+| Alembic migrations | ✅ Completo | env.py configurado, migration inicial |
+| Tabelas users + accounts | ✅ Completo | Modelos ORM + migration |
+| Script migração SQLite→PgSQL | ✅ Completo | `scripts/migrate_to_postgresql.py` |
+| Script backup SQLite | ✅ Completo | `scripts/backup_sqlite.py` |
+| Compatibilidade reversa | ✅ Completo | Helpers fetch_one/fetch_all mantidos |
 
-### ✅ Mudanças anteriores (v2.1 — IA)
+### ❌ Não implementado
 
-| Mudança | Detalhes |
-|---|---|
-| **Google Gemini como única IA** | Upload → transcrição → legenda em 1 chamada. |
-| **Ollama/Whisper removidos** | Não usa mais. |
-| **Config movida** | Gemini e Instagram para aba Configurações. |
+| Funcionalidade | Prioridade | Planejado |
+|---|---|---|
+| Storage remoto (R2/Supabase) | Média | v2.6 |
+| Autenticação (JWT) | Média | v2.7 |
+| Testes automatizados | Média | v2.8 |
+| Observabilidade | Baixa | — |
+| Rate limiting | Baixa | — |
+| Log rotation automática | Baixa | — |
 
----
+### ⚠️ Pendências menores
 
-### ✅ Funcionalidades atuais
-
-- **Upload drag & drop** — Arraste vídeos (max 10, 500MB cada)
-- Edição FFmpeg em lote (3 templates)
-- Máscara delogo, @ translúcido, ajuste de posição
-- Upload opcional de fundo/logo (fallback para assets padrão)
-- Download de vídeos processados (`/output/{filename}`)
-- Geração de legenda com Google Gemini + fallback local
-- **Scheduler automático** — publica posts agendados a cada 30s
-- **Retry** — até 3 tentativas com backoff exponencial
-- **Worker logs** — histórico de execução do scheduler
-- **Batch history** — registro de lotes processados
-- Publicação manual no Instagram
-- Configurações salvas automaticamente a cada 30s
-- Health check integrado (FFmpeg, Gemini, Instagram)
-- Interface responsiva com dark theme
+- `file_dialog_helper.py` — não usado (legacy desktop), pode ser removido
+- Barra de progresso de upload por arquivo
+- Mais categorias no gerador local
 
 ---
 
@@ -95,71 +88,66 @@ reduzir trabalho repetitivo, padronizar conteúdo e acelerar a criação de perf
 ```
 video_editor_lote/
 │
-├── main.py                     # Inicia o servidor web (FastAPI + uvicorn)
-├── requirements.txt            # Dependências (+ google-genai, schedule)
-├── README.md                   # Documentação
-├── RESUMO_PARA_CONTINUAR.md    # ⬅️ ESTE ARQUIVO — estado do projeto
+├── main.py                     # Inicia servidor web (FastAPI + uvicorn)
+├── requirements.txt            # Dependências
+├── README.md                   # Documentação atualizada
+├── RESUMO_PARA_CONTINUAR.md    # ⬅️ ESTE ARQUIVO
 │
-├── uploads/                    # 📁 Vídeos e imagens enviados via upload
+├── uploads/                    # Uploads de vídeos e imagens
+├── saida/                      # Vídeos processados
+├── assets/                     # fundo_padrao.jpg, logo_padrao.png
+├── config/                     # app.db, settings.json
 │
 ├── app/                        # 🔧 Core da aplicação
 │   ├── __init__.py
-│   ├── utils.py                # Config, caminhos, FFmpeg, listagem de vídeos
-│   ├── video_processor.py      # FFmpeg e processamento de vídeo
-│   ├── gemini_content.py       # Integração Google Gemini
-│   ├── free_ai_content.py      # Chama Gemini, fallback local
-│   ├── content_generator.py    # Gerador local (rascunho rápido)
-│   ├── file_dialog_helper.py   # ⬇️ Não usado (mantido para referência)
-│   ├── instagram_api.py        # Cliente da API do Instagram
-│   ├── database.py             # SQLite + migrations v2.3 (status, worker_logs, batch_history)
-│   ├── repository.py           # CRUD posts, settings, worker_logs, batch_history
-│   └── workers/                # 🆕 v2.3 — Workers de background
+│   ├── models.py               # 🆕 v2.5 — SQLAlchemy ORM models
+│   ├── database.py             # 🆕 v2.5 — SQLAlchemy engine/session + helpers
+│   ├── repository.py           # 🆕 v2.5 — ORM CRUD (posts, settings, logs, products, users, accounts)
+│   ├── utils.py                # FFmpeg, paths, config
+│   ├── video_processor.py      # FFmpeg pipeline (3 templates)
+│   ├── gemini_content.py       # Google Gemini API
+│   ├── free_ai_content.py      # Gemini + fallback local
+│   ├── content_generator.py    # Rascunho local
+│   ├── instagram_api.py        # Instagram Graph API client
+│   ├── product_search.py       # Busca ML + Shopee
+│   ├── file_dialog_helper.py   # ⬇️ Legacy (não usado)
+│   └── workers/
 │       ├── __init__.py
-│       ├── scheduler.py        # Daemon thread que publica automaticamente
-│       ├── publisher.py        # Lógica de publicação reutilizável
-│       └── retry.py            # Backoff exponencial e reset de stuck
+│       ├── scheduler.py        # Daemon de publicação
+│       ├── publisher.py        # Lógica reutilizável
+│       └── retry.py            # Backoff e reset
+│
+├── scripts/                    # 🆕 v2.5 — Scripts utilitários
+│   ├── migrate_to_postgresql.py # Migração SQLite → PostgreSQL
+│   └── backup_sqlite.py        # Backup do banco SQLite
+│
+├── alembic/                    # 🆕 v2.5 — Migrations
+│   ├── env.py                  # Configuração Alembic
+│   ├── script.py.mako          # Template de migration
+│   └── versions/
+│       └── a5b31616b948_initial_schema_v2_5.py  # Migration inicial
+│
+├── alembic.ini                 # 🆕 v2.5 — Config Alembic
+├── ROADMAP.md                  # 🆕 v2.5 — Roadmap do projeto
 │
 ├── web/                        # Interface web
 │   ├── __init__.py
-│   ├── server.py               # FastAPI: rotas, lifespan (inicia scheduler), servir arquivos
+│   ├── server.py               # FastAPI, lifespan, health check
 │   └── routes/
 │       ├── __init__.py
-│       ├── editor.py           # Upload, edição, thumbnail
-│       ├── content.py          # Gemini + rascunho
-│       ├── posts.py            # 🆕 Endpoints de scheduler, logs, histórico, manutenção
+│       ├── editor.py           # Upload, edição, preview
+│       ├── content.py          # Conteúdo (Gemini + local)
+│       ├── posts.py            # Fila, scheduler, logs
+│       ├── products.py         # Busca de produtos
 │       └── settings.py         # Configurações
 │
 ├── templates/
-│   └── index.html              # Interface com upload + scheduler control
+│   └── index.html              # Interface completa
 │
-├── static/
-│   ├── css/
-│   │   └── app.css             # Tema dark + status badges
-│   └── js/
-│       └── app.js              # Upload, preview, scheduler, logs
-│
-├── assets/                     # fundo_padrao.jpg, logo_padrao.png
-├── entrada/                    # ⬇️ Não usado
-└── saida/                      # Vídeos processados (servidos em /output/)
+└── static/
+    ├── css/app.css             # Tema dark
+    └── js/app.js               # Lógica frontend
 ```
-
----
-
-## ⚙️ Configuração da IA
-
-### Google Gemini
-
-- **API Key:** https://aistudio.google.com/apikey
-- **Modelo recomendado:** `gemini-2.0-flash`
-- **Tier gratuito:** 1.500 requisições/dia, vídeos até 1h
-- **Configurar na aba Configurações > Google Gemini**
-
-### Fluxo
-
-1. Seleciona vídeo na fila da aba Conteúdo
-2. "🤖 Gerar com Gemini" → servidor envia para API
-3. Gemini transcreve áudio + analisa frames + gera legenda publi
-4. Fallback: "📝 Rascunho rápido" se Gemini falhar
 
 ---
 
@@ -175,24 +163,45 @@ PASSO 1 ──── UPLOAD + EDIÇÃO ─────────────�
 
 PASSO 2 ──── GERAÇÃO DE CONTEÚDO ──────────────────────────
   • Aba "Conteúdo" → fila de vídeos
-  • "🤖 Gerar com Gemini" → transcrição + legenda
-  • Revisa → "✅ Aprovar"
+  • "Gerar com Gemini" → transcrição + legenda
+  • Revisa → "Aprovar"
 
-PASSO 3 ──── AGENDAR E PUBLICAR ───────────────────────────
+PASSO 3 ──── BUSCAR PRODUTO ───────────────────────────────
+  • Aba "Produtos" → busca ML/Shopee
+  • Seleciona produto
+  • Gera link de afiliado
+  • Vincula ao post
+
+PASSO 4 ──── AGENDAR E PUBLICAR ───────────────────────────
   • Aba "Postagens" → fila com status
-  • Define data/hora → status AGENDADO
+  • Define data/hora → AGENDADO
   • Scheduler automático publica no horário
-  • Ou "📤 Publicar agora" manual
+  • Ou "Publicar agora" manual
   • Retry automático em caso de erro (máx 3)
-  • Histórico de execução em Worker Logs
 ```
+
+---
+
+## ⚙️ Configuração da IA
+
+### Google Gemini
+- **API Key:** https://aistudio.google.com/apikey
+- **Modelo recomendado:** `gemini-2.0-flash`
+- **Tier gratuito:** 1.500 requisições/dia
+- **Configurar na aba Configurações > Google Gemini**
+
+### Fluxo
+1. Seleciona vídeo na fila da aba Conteúdo
+2. "🤖 Gerar com Gemini" → servidor envia para API
+3. Gemini transcreve áudio + analisa frames + gera legenda publi
+4. Fallback: "📝 Rascunho rápido" se Gemini falhar
 
 ---
 
 ## 🛠️ Como rodar
 
 ```bash
-cd "C:\Users\Hugo\Documents\APP CRIAÇÃO VIDEO\video_editor_lote"
+cd "C:\Users\Windows\Documents\VIDEO EDITOR LOTE"
 pip install -r requirements.txt
 python main.py
 # → http://localhost:5000
@@ -204,6 +213,7 @@ python main.py
 ```
 # Sistema
 GET  /api/health                      → Health check (+ FFmpeg/Gemini/IG status)
+GET  /api/config/paths                → Caminhos do sistema
 
 # Upload e Edição
 GET  /api/editor/templates            → Lista templates
@@ -214,15 +224,17 @@ POST /api/editor/upload-image         → Upload imagem (fundo/logo)
 POST /api/editor/thumbnail            → Thumbnail
 POST /api/editor/process              → Inicia processamento
 GET  /api/editor/stream/{id}          → SSE progresso
+GET  /api/editor/default-paths        → Caminhos padrão
 
 # Arquivos
 GET  /uploads/{session}/{file}        → Servir uploads
-GET  /output/{filename}               → Download vídeos
+GET  /output/{filename}               → Download vídeos processados
 
 # Conteúdo
 POST /api/content/generate-local      → Rascunho rápido
 POST /api/content/generate-ai         → Gera com Gemini
-POST /api/content/test-gemini         → Testa conexão
+POST /api/content/test-gemini         → Testa conexão Gemini
+POST /api/content/draft               → Rascunho rápido por nome
 
 # Postagens
 GET  /api/posts                       → Lista fila
@@ -233,18 +245,26 @@ POST /api/posts/{id}/publish          → Publicar agora
 GET  /api/posts/output/videos         → Lista saída
 GET  /api/posts/stats/summary         → Status da fila
 
-# 🆕 Scheduler
+# Scheduler
 GET  /api/posts/scheduler/status      → Scheduler rodando?
 POST /api/posts/scheduler/start       → Iniciar scheduler
 POST /api/posts/scheduler/stop        → Parar scheduler
 
-# 🆕 Logs e Histórico
-GET  /api/posts/logs                  → Logs do worker (?post_id=&level=&limit=)
+# Logs e Histórico
+GET  /api/posts/logs                  → Logs do worker
 POST /api/posts/logs/clean            → Limpar logs antigos
 GET  /api/posts/batch-history         → Histórico de lotes
 POST /api/posts/batch-history         → Registrar lote
 GET  /api/posts/content-history       → Histórico de conteúdo
 POST /api/posts/maintenance/reset-stuck → Resetar posts travados
+
+# 🆕 Produtos (v2.4)
+POST /api/products/search             → Busca ML + Shopee
+GET  /api/products/search/{source}    → Busca fonte específica
+POST /api/products/associate          → Associar produto ao post
+GET  /api/products                    → Listar produtos
+POST /api/products/affiliate-link     → Gerar link de afiliado
+DELETE /api/products/{id}             → Remover produto
 
 # Configurações
 GET  /api/settings                    → Lê configurações
@@ -253,60 +273,101 @@ PUT  /api/settings                    → Salva configurações
 
 ---
 
-## 📊 Próximos passos (roadmap)
+## 📊 Roadmap
 
-### ✅ Concluído (v2.3)
+### ✅ Concluído (v2.0 → v2.5)
 
-- [x] Scheduler automático (worker daemon, 30s)
+**Upload e Edição:**
+- [x] Upload drag & drop (max 10, 500MB)
+- [x] Três templates de layout vertical
+- [x] Máscara delogo para ocultar marca d'água
+- [x] Sobreposição de @ translúcido
+- [x] Logo personalizada no canto inferior
+- [x] Ajuste de tamanho, largura e posição
+- [x] Preview canvas em tempo real
+- [x] Download de vídeos processados
+
+**Conteúdo e IA:**
+- [x] Google Gemini como única IA (transcrição + legenda)
+- [x] Fallback local (rascunho rápido)
+- [x] Editor de legenda completo
+- [x] Aprovação de conteúdo
+- [x] Histórico de conteúdo gerado
+
+**Scheduler e Publicação:**
+- [x] Scheduler automático (daemon 30s)
 - [x] Retry com backoff exponencial (máx 3)
 - [x] Lock anti-duplicação (worker_lock)
 - [x] Status: PENDENTE → AGENDADO → PROCESSANDO → PUBLICADO / ERRO
+- [x] Publisher reutilizável (scheduler + manual)
+- [x] Publicação Instagram (Graph API v25.0)
+
+**Logs e Histórico:**
 - [x] Worker logs (tabela + API + interface)
 - [x] Batch history (tabela + API + interface)
-- [x] Publisher reutilizável (scheduler + manual)
+- [x] Content history (tabela + API)
+- [x] Limpeza de logs antigos
+
+**Produtos (v2.4):**
+- [x] Busca Mercado Livre (scraping HTML + JSON)
+- [x] Busca Shopee (API + Google fallback)
+- [x] Geração de link de afiliado (ML Cliques + Shopee Affiliate)
+- [x] Associação produto ↔ post
+- [x] Tabela products no banco
+
+**Sistema:**
 - [x] Health check (FFmpeg, Gemini, Instagram)
-- [x] requirements.txt atualizado (google-genai)
-- [x] Botão duplicar legenda
-- [x] Migração automática de status antigos
+- [x] Configurações salvas automaticamente (30s)
+- [x] Dark theme responsivo
+- [x] ~40 endpoints REST documentados
 
-### Prioridade alta (v2.4 — Produto + Afiliado)
+### ✅ PostgreSQL (v2.5)
+- [x] SQLAlchemy ORM para todos os modelos (8 tabelas)
+- [x] DATABASE_URL funcional: SQLite (dev) / PostgreSQL (prod)
+- [x] Alembic configurado com migrations
+- [x] Tabelas `users` + `accounts` (preparação para auth)
+- [x] Índices de performance (status, worker_logs)
+- [x] Script de migração de dados SQLite → PostgreSQL
+- [x] Script de backup do banco SQLite
+- [x] Compatibilidade reversa mantida (helpers fetch_one/fetch_all)
 
-1. **Busca de produto na Shopee/Mercado Livre**
-   - Identificar produto pelo vídeo/legenda
-   - Buscar item parecido
-   - Gerar/salvar link de afiliado
-   - Associar cada vídeo ao produto correspondente
+### 🔄 v2.6 — Storage Remoto
+- StorageProvider pattern (Local, R2, Supabase)
+- Upload → Storage → URL pública
+- Salvar original_url, processed_url, thumbnail_url
 
-### Prioridade média (v2.5 — PostgreSQL)
+### 🔄 v2.7 — Autenticação
+- Login com JWT
+- Papéis: admin, operator
+- Auditoria de ações
+- Rotas protegidas
 
-2. **Migrar SQLite → PostgreSQL**
-   - Implementar DATABASE_URL funcional
-   - Alembic para migrations
-   - Tabelas: contents, products, posts, settings, logs
-   - Manter SQLite apenas em dev
+### 🔄 v2.8 — Testes
+- tests/unit/ + tests/integration/
+- Cobertura: video_processor, publisher, scheduler, instagram_api, product_search
+- Meta: 80% módulos críticos
 
-### Prioridade futura (v2.6 — Storage)
-
-3. **Storage remoto (Cloudflare R2 / Supabase)**
-   - StorageProvider (Local, R2, Supabase)
-   - Upload → Storage → URL pública → Publicação
-   - Salvar original_url e processed_url
-
-### Pequenas pendências
-
-4. Barra de progresso de upload por arquivo
-5. Remover file_dialog_helper.py (não usado)
-6. Adicionar mais categorias no gerador local
+### 📝 Backlog
+- Observabilidade (CPU, RAM, fila, métricas)
+- Rate limiting + CORS + validação de upload
+- Exportar logs CSV
+- Duplicar post / lote
+- Clonar configuração entre perfis
+- Filtros de histórico (data, status, fonte)
+- Progresso upload via WebSocket
+- Paginação na API
+- Remover `file_dialog_helper.py` (legacy)
+- Mais categorias no gerador local
 
 ---
 
 ## 🐛 Dívida técnica conhecida
 
-- **Sem testes automatizados** — Toda a validação é manual
+- **Sem testes automatizados** — Toda validação é manual
 - **Sem rate limiting** — Upload e processamento sem proteção
 - **Sem autenticação** — App aberto para qualquer um na rede
 - **SQLite em WAL mode** — Funciona para dev, mas precisa de PostgreSQL em produção
-- **Scheduler single-thread** — Publica 1 post por tick. Se tiver muitos posts agendados ao mesmo tempo, pode atrasar
+- **Scheduler single-thread** — Publica 1 post por tick
 - **Logs sem rotação** — worker_logs cresce indefinidamente (limpeza manual via API)
 
 ---

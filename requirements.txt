@@ -1,10 +1,6 @@
-# VideoEditorLote v2.0 - Dependencias
+# VideoEditorLote v2.5 - Dependencias
 
-# Desktop (mantido para compatibilidade)
-customtkinter>=5.2.2
-pyinstaller>=6.0.0
-
-# Web (novo)
+# Web
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 jinja2>=3.1.0
@@ -15,13 +11,19 @@ python-multipart>=0.0.12
 requests>=2.32.0
 google-genai>=1.0.0
 
-# Workers
-# (scheduler usa threading nativo, sem dependência externa)
-
 # v2.4 — Product search
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
 cloudscraper>=1.2.0
+
+# v2.5 — PostgreSQL (SQLAlchemy + Alembic)
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.0
+
+# Desktop (legado, mantido para compatibilidade)
+customtkinter>=5.2.2
+pyinstaller>=6.0.0
 
 # Python 3.10+ built-in (no pip needed):
 #   sqlite3, pathlib, json, asyncio, threading, uuid, subprocess
