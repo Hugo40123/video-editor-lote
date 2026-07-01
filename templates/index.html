@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoEditorLote</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">🎬</div>
+
+        <button class="nav-item active" data-tab="editor">
+            🎞️
+            <span class="tooltip">Edição de vídeo</span>
+        </button>
+        <button class="nav-item" data-tab="content">
+            🤖
+            <span class="tooltip">Conteúdo e IA</span>
+        </button>
+        <button class="nav-item" data-tab="posts">
+            📤
+            <span class="tooltip">Postagens</span>
+        </button>
+        <button class="nav-item" data-tab="products">
+            🛒
+            <span class="tooltip">Produtos</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+            ⚙️
+            <span class="tooltip">Configurações</span>
+        </button>
+
+        <div class="sidebar-spacer"></div>
+        <span class="nav-status" id="statusIndicator" title="Servidor online"></span>
+    </nav>
+
+    <!-- ═══ MAIN ═══ -->
+    <div class="main-area">
+
+        <header class="topbar">
+            <span class="topbar-title">Editor de Vídeos em Lote</span>
+            <span class="topbar-badge">v2.0</span>
+            <div class="topbar-spacer"></div>
+            <button class="topbar-action" onclick="refreshAll()">🔄 Recarregar</button>
+        </header>
+
+        <div class="content-area">
+
+            <!-- ════════ TAB: EDITOR ════════ -->
+            <section id="tab-editor" class="tab-content active">
+                <div class="editor-grid">
+                    <div class="editor-files card">
+                        <div class="card-title">🎬 Upload de vídeos</div>
+
+                        <!-- ═══ Upload Zone ═══ -->
+                        <div class="upload-zone" id="uploadZone">
+                            <div class="upload-zone-icon">📤</div>
+                            <div class="upload-zone-text">Arraste vídeos aqui</div>
+                            <div class="upload-zone-hint">ou clique para selecionar (máx 10 vídeos, 500MB cada)</div>
+                            <input type="file" id="fileInput" class="upload-zone-input" multiple accept="video/*" hidden>
+                        </div>
+
+                        <!-- ═══ Uploaded Files List ═══ -->
+                        <div class="uploaded-files" id="uploadedFiles">
+                            <div class="uploaded-files-empty">Nenhum vídeo enviado ainda.</div>
+                        </div>
+                        <div class="uploaded-files-info" id="uploadInfo">
+                            <span id="uploadCount">0</span> / 10 vídeos
+                            <span id="uploadClearBtn" class="upload-clear-btn" onclick="clearUploadedFiles()">🗑️ Limpar</span>
+                        </div>
+
+                        <hr class="divider">
+                        <div class="card-title" style="margin-top:8px;">⚙️ Configuração de edição</div>
+
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>🖼️ Fundo</label>
+                                <div class="upload-image-row" id="bgUploadRow">
+                                    <span class="upload-image-name" id="bgImageName">📷 Padrão (assets/fundo_padrao.jpg)</span>
+                                    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('bgFileInput').click()">Trocar</button>
+                                    <input type="file" id="bgFileInput" class="upload-zone-input" accept="image/*" hidden>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>©️ Logo</label>
+                                <div class="upload-image-row" id="logoUploadRow">
+                                    <span class="upload-image-name" id="logoImageName">📷 Padrão (assets/logo_padrao.png)</span>
+                                    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('logoFileInput').click()">Trocar</button>
+                                    <input type="file" id="logoFileInput" class="upload-zone-input" accept="image/*" hidden>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>📐 Template</label>
+                                <select id="templateSelect" class="form-input"></select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>⏱️ Duração max (s)</label>
+                                <input type="number" id="maxDuration" class="form-input" placeholder="Ex: 60" min="0">
+                            </div>
+                            <div class="form-group" style="display:flex; align-items:flex-end; gap:12px;">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="applyLogo" checked> Aplicar logo
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="collapse-section">
+                            <button class="collapse-btn" onclick="toggleCollapse(this)">⚙️ Ajustes avançados de posição ▼</button>
+                            <div class="collapse-body">
+                                <div class="slider-group">
+                                    <label>Tamanho do vídeo <span class="slider-value" id="videoSizeVal">100%</span></label>
+                                    <input type="range" id="videoSize" min="60" max="140" value="100" oninput="updateSlider('videoSize','videoSizeVal','%');schedulePreview();">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Largura do vídeo <span class="slider-value" id="videoWidthVal">100%</span></label>
+                                    <input type="range" id="videoWidth" min="50" max="180" value="100" oninput="updateSlider('videoWidth','videoWidthVal','%');schedulePreview();">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Horizontal <span class="slider-value" id="videoOffsetXVal">0 px</span></label>
+                                    <input type="range" id="videoOffsetX" min="-420" max="420" value="0" oninput="updateSlider('videoOffsetX','videoOffsetXVal',' px');schedulePreview();">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Vertical <span class="slider-value" id="videoOffsetYVal">0 px</span></label>
+                                    <input type="range" id="videoOffsetY" min="-640" max="640" value="0" oninput="updateSlider('videoOffsetY','videoOffsetYVal',' px');schedulePreview();">
+                                </div>
+                                <hr class="divider">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="removeWatermark" onchange="schedulePreview()">
+                                    🎯 Ocultar marca d'água central
+                                </label>
+                                <div class="slider-group">
+                                    <label>Máscara X <span class="slider-value" id="delogoXVal">190 px</span></label>
+                                    <input type="range" id="delogoX" min="0" max="980" value="190" oninput="updateSlider('delogoX','delogoXVal',' px');schedulePreview();">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Máscara Y <span class="slider-value" id="delogoYVal">860 px</span></label>
+                                    <input type="range" id="delogoY" min="0" max="1760" value="860" oninput="updateSlider('delogoY','delogoYVal',' px');schedulePreview();">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Largura máscara</label>
+                                        <input type="number" id="delogoWidth" class="form-input" value="700" onchange="schedulePreview()">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Altura máscara</label>
+                                        <input type="number" id="delogoHeight" class="form-input" value="160" onchange="schedulePreview()">
+                                    </div>
+                                </div>
+                                <hr class="divider">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="applyTextMark" onchange="schedulePreview()">
+                                    🏷️ Aplicar @ no centro
+                                </label>
+                                <div class="form-group">
+                                    <input type="text" id="textMark" class="form-input" placeholder="@sua_marca" oninput="schedulePreview()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tamanho da fonte</label>
+                                    <input type="number" id="textMarkSize" class="form-input" value="76" min="20" max="160" onchange="schedulePreview()">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Horizontal @ <span class="slider-value" id="textMarkXVal">0 px</span></label>
+                                    <input type="range" id="textMarkOffsetX" min="-450" max="450" value="0" oninput="updateSlider('textMarkOffsetX','textMarkXVal',' px');schedulePreview();">
+                                </div>
+                                <div class="slider-group">
+                                    <label>Vertical @ <span class="slider-value" id="textMarkYVal">0 px</span></label>
+                                    <input type="range" id="textMarkOffsetY" min="-800" max="800" value="0" oninput="updateSlider('textMarkOffsetY','textMarkYVal',' px');schedulePreview();">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-panel">
+                        <div class="card" style="margin-bottom:16px;">
+                            <div class="card-title">Prévia</div>
+                            <div class="preview-container">
+                                <canvas id="previewCanvas" class="preview-canvas" width="142" height="252"></canvas>
+                                <span class="preview-label" id="previewLabel">1080 x 1920</span>
+                            </div>
+                            <div class="preview-info" id="previewInfo">
+                                <span class="preview-info-icon">🎬</span>
+                                <span class="preview-info-text" id="previewVideoName">Nenhum vídeo selecionado</span>
+                            </div>
+                            <div class="btn-row">
+                                <button class="btn btn-sm btn-ghost" onclick="refreshPreview()">↻ Atualizar prévia</button>
+                                <button class="btn btn-sm btn-ghost" onclick="resetPreview()">↺ Centralizar</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <button class="btn btn-primary btn-lg" id="processBtn" onclick="startProcessing()">
+                                ▶ Gerar vídeos
+                            </button>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="processing-indicator" id="processingIndicator">
+                                <span class="spinner"></span>
+                                <span id="processingStatus">Processando...</span>
+                            </div>
+                            <div class="log-box" id="editorLog">
+                                <span class="log-placeholder">Configure os caminhos e clique em "Gerar vídeos".</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════════ TAB: CONTENT (IA simplificada — só Gemini) ════════ -->
+            <section id="tab-content" class="tab-content">
+                <div class="content-grid-main">
+                    <div class="card queue-panel">
+                        <div class="card-title">📋 Fila de vídeos</div>
+                        <div class="queue-list" id="contentQueueList">
+                            <div class="queue-placeholder">
+                                <span class="placeholder-icon">🎬</span>
+                                Nenhum vídeo na fila.<br>
+                                Processe vídeos na aba <strong>Edição</strong> ou importe da pasta de saída.
+                            </div>
+                        </div>
+                        <div class="btn-row" style="margin-top:10px;">
+                            <button class="btn btn-sm btn-ghost" onclick="importOutputVideos()">📥 Importar saída</button>
+                            <button class="btn btn-sm btn-ghost" onclick="loadPostQueue()">↻ Atualizar</button>
+                            <button class="btn btn-sm" onclick="generateLocalContent()">📝 Rascunho rápido</button>
+                            <button class="btn btn-sm btn-primary" onclick="generateAIContent()">🤖 Gerar com Gemini</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">✍️ Editor de legenda</div>
+                        <div class="item-meta" id="contentMeta">Nenhum item selecionado</div>
+
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Palavras-chave</label>
+                                <input type="text" id="contentKeywords" class="form-input" placeholder="produto, benefício">
+                            </div>
+                            <div class="form-group">
+                                <label>Termo de busca</label>
+                                <input type="text" id="contentProductQuery" class="form-input" placeholder="para Shopee/ML">
+                            </div>
+                            <div class="form-group">
+                                <label>Link afiliado</label>
+                                <input type="url" id="contentAffiliateLink" class="form-input" placeholder="https://...">
+                            </div>
+                        </div>
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Título</label>
+                                <input type="text" id="contentTitle" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>CTA</label>
+                                <input type="text" id="contentCta" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Hashtags</label>
+                                <input type="text" id="contentHashtags" class="form-input">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Legenda final</label>
+                            <textarea id="contentCaption" class="form-textarea" rows="5"></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-sm btn-ghost" onclick="copyCaption('contentCaption')">📋 Copiar</button>
+                            <button class="btn btn-sm" onclick="saveContent()">💾 Salvar na fila</button>
+                            <button class="btn btn-sm btn-success" onclick="approveContent()">✅ Aprovar</button>
+                        </div>
+                        <div class="log-box" id="contentLog">
+                            <span class="log-placeholder">Selecione um vídeo e clique em "Gerar com Gemini".</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════════ TAB: POSTS (v2.3 — scheduler, histórico, status) ════════ -->
+            <section id="tab-posts" class="tab-content">
+                <div class="card ig-card">
+                    <div class="card-title">📱 Publicação no Instagram</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Perfil</label>
+                            <input type="text" id="postProfile" class="form-input" value="Perfil principal">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-ghost" onclick="switchTab('settings')">🔑 Configurar token na aba Configurações</button>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Legenda padrão</label>
+                            <input type="text" id="postDefaultCaption" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Hashtags padrão</label>
+                            <input type="text" id="postDefaultHashtags" class="form-input" value="#achadinhos #shopee #mercadolivre">
+                        </div>
+                    </div>
+                    <div class="setting-row" style="padding:8px 0;border-bottom:none;">
+                        <span class="setting-label">Status Instagram</span>
+                        <span class="setting-value" id="postIgStatus" style="font-size:12px;color:var(--text-dim);">Verificar na aba Configurações</span>
+                    </div>
+                </div>
+
+                <!-- ═══ Scheduler Control ═══ -->
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-title">⏰ Agendamento automático</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Scheduler</label>
+                            <span id="schedulerStatus" style="color:var(--text-dim);font-size:12px;">Verificando...</span>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+                            <button class="btn btn-sm btn-success" id="schedulerStartBtn" onclick="schedulerStart()">▶ Iniciar</button>
+                            <button class="btn btn-sm btn-danger" id="schedulerStopBtn" onclick="schedulerStop()">⏹ Parar</button>
+                        </div>
+                    </div>
+                    <div class="setting-row" style="padding:6px 0;font-size:11px;color:var(--text-dim);">
+                        Verifica a cada 30s por posts agendados. Retry automático com backoff exponencial (máx 3 tentativas).
+                    </div>
+                </div>
+
+                <div class="posts-grid-main">
+                    <div class="card video-list-panel">
+                        <div class="card-title">🎬 Vídeos gerados</div>
+                        <div class="queue-list" id="postVideoList">
+                            <div class="queue-placeholder">
+                                <span class="placeholder-icon">📂</span>
+                                Nenhum vídeo na pasta de saída.
+                            </div>
+                        </div>
+                        <div class="btn-row" style="margin-top:10px;">
+                            <button class="btn btn-sm btn-ghost" onclick="loadOutputVideos()">↻ Atualizar</button>
+                            <button class="btn btn-sm btn-primary" onclick="addAllToQueue()">➕ Adicionar todos à fila</button>
+                        </div>
+                    </div>
+
+                    <div class="card queue-panel">
+                        <div class="card-title">📋 Fila de postagens</div>
+                        <div class="queue-list" id="postQueueList">
+                            <div class="queue-placeholder">
+                                <span class="placeholder-icon">📋</span>
+                                Fila vazia.
+                            </div>
+                        </div>
+                        <div class="btn-row" style="margin-top:10px;">
+                            <button class="btn btn-sm btn-ghost" onclick="loadPostQueue()">↻ Atualizar</button>
+                            <button class="btn btn-sm btn-ghost" onclick="loadWorkerLogs()">📋 Logs do worker</button>
+                            <button class="btn btn-sm btn-ghost" onclick="loadBatchHistory()">📊 Histórico de lotes</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">📝 Detalhes do item</div>
+                        <div class="item-meta" id="postMeta">Nenhum item selecionado</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="postStatus" class="form-input">
+                                    <option value="PENDENTE">📋 Pendente</option>
+                                    <option value="AGENDADO">⏰ Agendado</option>
+                                    <option value="PROCESSANDO">🔄 Processando</option>
+                                    <option value="PUBLICADO">✅ Publicado</option>
+                                    <option value="ERRO">❌ Erro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Agendar para</label>
+                                <input type="datetime-local" id="postScheduledFor" class="form-input">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Retry count</label>
+                            <span id="postRetryCount" style="font-size:12px;color:var(--text-dim);">0</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Legenda</label>
+                            <textarea id="postCaption" class="form-textarea" rows="4"></textarea>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-sm btn-ghost" onclick="savePostItem()">💾 Salvar</button>
+                            <button class="btn btn-sm btn-ghost" onclick="copyCaption('postCaption')">📋 Copiar legenda</button>
+                            <button class="btn btn-sm btn-ghost" onclick="duplicateCaption()">📑 Duplicar legenda</button>
+                            <button class="btn btn-sm btn-danger" onclick="removePostItem()">🗑️ Remover</button>
+                            <button class="btn btn-sm btn-success" onclick="publishPost()">📤 Publicar agora</button>
+                        </div>
+                        <div class="log-box" id="postLog">
+                            <span class="log-placeholder">Selecione um item da fila.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Worker Logs Modal ═══ -->
+                <div class="card" id="workerLogsSection" style="display:none;margin-top:20px;">
+                    <div class="card-title">📋 Logs do Worker
+                        <button class="btn btn-sm btn-ghost" style="float:right;" onclick="document.getElementById('workerLogsSection').style.display='none'">✕ Fechar</button>
+                    </div>
+                    <div class="log-box" id="workerLogsBox" style="height:300px;">
+                        <span class="log-placeholder">Carregando logs...</span>
+                    </div>
+                </div>
+
+                <!-- ═══ Batch History Modal ═══ -->
+                <div class="card" id="batchHistorySection" style="display:none;margin-top:20px;">
+                    <div class="card-title">📊 Histórico de lotes
+                        <button class="btn btn-sm btn-ghost" style="float:right;" onclick="document.getElementById('batchHistorySection').style.display='none'">✕ Fechar</button>
+                    </div>
+                    <div class="queue-list" id="batchHistoryList" style="max-height:300px;">
+                        <span class="log-placeholder">Carregando...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════════ TAB: PRODUCTS (v2.4 — Busca de Produtos) ════════ -->
+            <section id="tab-products" class="tab-content">
+                <div class="products-grid-main">
+                    <div class="card products-search-panel">
+                        <div class="card-title">🔍 Buscar Produto</div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:3;">
+                                <label>Termo de busca</label>
+                                <div class="input-row">
+                                    <input type="text" id="productSearchQuery" class="form-input" placeholder="Ex: fone bluetooth, iphone, carregador turbo...">
+                                    <button class="btn btn-primary" onclick="searchProducts()">🔍 Buscar</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="searchML" checked onchange="toggleSourceBtn()">
+                                    Mercado Livre
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="searchShopee" checked onchange="toggleSourceBtn()">
+                                    Shopee
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>Resultados</label>
+                                <select id="productSearchLimit" class="form-input">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="log-box" id="productSearchLog" style="height:80px;">
+                            <span class="log-placeholder">Digite o nome do produto e clique em Buscar.</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🛒 Resultados da busca
+                            <span id="productResultCount" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-secondary);font-size:12px;">0 produtos</span>
+                        </div>
+                        <div class="products-results" id="productResults">
+                            <div class="queue-placeholder">
+                                <span class="placeholder-icon">🔍</span>
+                                Faça uma busca para encontrar produtos.<br>
+                                Os resultados aparecerão aqui.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Associar Produto ao Post ═══ -->
+                <div class="card" style="margin-top:20px;">
+                    <div class="card-title">📋 Vincular produto a um post</div>
+                    <div class="form-row three-col">
+                        <div class="form-group">
+                            <label>Post (vídeo)</label>
+                            <select id="productPostSelect" class="form-input">
+                                <option value="">Selecione um post...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Produto selecionado</label>
+                            <span id="selectedProductInfo" style="font-size:12px;color:var(--text-dim);display:block;padding:8px 0;">Nenhum produto selecionado.</span>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-success" onclick="associateProduct()">🔗 Vincular ao post</button>
+                        </div>
+                    </div>
+                    <div class="log-box" id="productAssociateLog" style="height:60px;">
+                        <span class="log-placeholder">Selecione um post e um produto para vincular.</span>
+                    </div>
+                </div>
+
+                <!-- ═══ Produtos Vinculados ═══ -->
+                <div class="card" style="margin-top:20px;">
+                    <div class="card-title">📦 Produtos vinculados</div>
+                    <div class="products-linked" id="productsLinked">
+                        <div class="queue-placeholder">
+                            <span class="placeholder-icon">📦</span>
+                            Nenhum produto vinculado ainda.
+                        </div>
+                    </div>
+                    <div class="btn-row" style="margin-top:10px;">
+                        <button class="btn btn-sm btn-ghost" onclick="loadLinkedProducts()">↻ Atualizar</button>
+                    </div>
+                </div>
+
+                <!-- ═══ Config de Afiliados ═══ -->
+                <div class="card" style="margin-top:20px;">
+                    <div class="card-title">🔗 Links de Afiliado</div>
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label>Mercado Livre — ID de Afiliado (mlext)</label>
+                            <input type="text" id="mlAffiliateId" class="form-input" placeholder="Seu ID do Mercado Livre Cliques">
+                        </div>
+                        <div class="form-group">
+                            <label>Shopee — ID de Afiliado (af_id)</label>
+                            <input type="text" id="shopeeAffiliateId" class="form-input" placeholder="Seu ID do Shopee Affiliate">
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="form-group">
+                            <label>Shopee Sub-ID (opcional)</label>
+                            <input type="text" id="shopeeSubId" class="form-input" placeholder="Ex: instagram, tiktok, blog">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-sm" onclick="saveAffiliateIds()">💾 Salvar IDs</button>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-dim);line-height:1.6;margin-top:8px;">
+                        Para gerar links de afiliado, cadastre-se nos programas:
+                        <a href="https://mercadolivre.com.br/l/afiliados-home" target="_blank" style="color:var(--accent)">Mercado Livre Cliques</a> e
+                        <a href="https://affiliate.shopee.com.br" target="_blank" style="color:var(--accent)">Shopee Affiliate</a>.
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════════ TAB: SETTINGS (Gemini + Instagram + Sistema) ════════ -->
+            <section id="tab-settings" class="tab-content">
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card-title">🖥️ Sistema</div>
+                        <div class="setting-row">
+                            <span class="setting-label">Status</span>
+                            <span class="setting-value" style="color:var(--green)">✅ Online</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Versão</span>
+                            <span class="setting-value">2.0.0</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">FFmpeg</span>
+                            <span class="setting-value" id="ffmpegStatus">Verificando...</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">📤 Uploads</span>
+                            <span class="setting-value" id="settingUploadDir" style="font-size:11px;">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">📁 Pasta saída</span>
+                            <span class="setting-value" id="settingOutputDir">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">Banco de dados</span>
+                            <span class="setting-value" id="settingDbPath" style="font-size:11px;">—</span>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <button class="btn btn-sm btn-ghost" onclick="checkFfmpeg()">🔍 Verificar FFmpeg</button>
+                            <button class="btn btn-sm btn-ghost" onclick="refreshAll()">🔄 Recarregar</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🤖 Google Gemini (IA)</div>
+                        <div class="form-group">
+                            <label>🔑 Chave da API</label>
+                            <input type="password" id="settingsGeminiKey" class="form-input" placeholder="Cole sua chave do Google AI Studio">
+                        </div>
+                        <div class="form-group">
+                            <label>Modelo</label>
+                            <select id="settingsGeminiModel" class="form-input">
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (recomendado)</option>
+                                <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </select>
+                        </div>
+                        <div class="setting-row" style="border-bottom:none;">
+                            <span class="setting-label">Status</span>
+                            <span class="setting-value" id="settingsGeminiStatus" style="font-size:12px;">Não configurado</span>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-sm btn-primary" onclick="saveGeminiSettings()">💾 Salvar</button>
+                            <button class="btn btn-sm btn-ghost" onclick="testGeminiFromSettings()">🔄 Testar conexão</button>
+                        </div>
+                        <details style="margin-top:12px;font-size:12px;color:var(--text-dim);">
+                            <summary style="cursor:pointer;color:var(--text-secondary);">📖 Como obter a chave da API</summary>
+                            <ol style="margin-top:8px;padding-left:18px;line-height:1.8;">
+                                <li>Acesse <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a></li>
+                                <li>Clique em <strong>"Criar chave de API"</strong></li>
+                                <li>Copie a chave gerada (começa com <code>AIza...</code>)</li>
+                                <li>Cole no campo acima e clique em <strong>"Salvar"</strong></li>
+                                <li>O tier gratuito inclui 1.500 requisições/dia no modelo Flash</li>
+                            </ol>
+                        </details>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🔐 Instagram</div>
+                        <div class="form-group">
+                            <label>IG User ID</label>
+                            <input type="text" id="settingsIgUserId" class="form-input" placeholder="ID numérico do perfil">
+                        </div>
+                        <div class="form-group">
+                            <label>Token de acesso</label>
+                            <input type="password" id="settingsIgAccessToken" class="form-input" placeholder="Token da API do Meta">
+                        </div>
+                        <div class="setting-row" style="border-bottom:none;padding-bottom:0;">
+                            <span class="setting-label">Status</span>
+                            <span class="setting-value" id="settingsIgStatus" style="font-size:12px;">Não verificado</span>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn btn-sm btn-success" onclick="saveIgSettings()">💾 Salvar credenciais</button>
+                            <button class="btn btn-sm btn-ghost" onclick="testIgConnectionReal()">🔍 Testar conexão real</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">📊 Fila de postagens</div>
+                        <div class="setting-row">
+                            <span class="setting-label">Total</span>
+                            <span class="setting-value" id="queueTotal">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">📋 Pendente</span>
+                            <span class="setting-value" id="queuePendente" style="color:var(--text-dim)">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">⏰ Agendado</span>
+                            <span class="setting-value" id="queueAgendado" style="color:var(--amber)">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">✅ Publicado</span>
+                            <span class="setting-value" id="queuePublicado" style="color:var(--green)">—</span>
+                        </div>
+                        <div class="setting-row">
+                            <span class="setting-label">❌ Erro</span>
+                            <span class="setting-value" id="queueErro" style="color:var(--red)">—</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">💾 Dados</div>
+                        <p style="color:var(--text-dim);font-size:13px;line-height:1.6;">
+                            Todos os dados são salvos automaticamente no banco SQLite local.<br><br>
+                            • Configurações da IA (Gemini)<br>
+                            • Fila de postagens<br>
+                            • Histórico de legendas<br>
+                            • Credenciais do Instagram<br><br>
+                            <span style="font-size:11px;color:var(--text-dim);">
+                                Para migrar para um banco remoto no futuro, configure a variável de ambiente <code>DATABASE_URL</code>.
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+        </div><!-- /content-area -->
+    </div><!-- /main-area -->
+</div><!-- /app-layout -->
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

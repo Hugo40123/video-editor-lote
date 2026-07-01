@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.env
+.venv.bak/
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project specific - databases & configs
+config/app.db
+config/settings.json
+config/*.tmp
+
+# Uploads and generated content
+uploads/
+entrada/
+saida/
+imagem fundo/
+
+# OS
+.DS_Store
+Thumbs.db
