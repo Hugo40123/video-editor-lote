@@ -1,6 +1,6 @@
 # Resumo para continuar o projeto
 
-**Data do resumo:** 2026-07-01 (atualizado v2.5)
+**Data do resumo:** 2026-07-01 (atualizado v2.8)
 
 **Projeto:** `VideoEditorLote`
 
@@ -9,7 +9,7 @@
 C:\Users\Windows\Documents\VIDEO EDITOR LOTE
 ```
 
-**Versão atual:** 2.5.0 — Web App (FastAPI + SQLAlchemy + Alembic + Gemini + Scheduler + Busca Produtos + PostgreSQL)
+**Versão atual:** 2.8.0 — Web App (FastAPI + SQLAlchemy + Alembic + Gemini + Scheduler + Produtos + PostgreSQL + Testes)
 
 ---
 
@@ -22,7 +22,8 @@ Automatizar uma esteira de perfis de afiliados:
 3. ✅ **Scheduler de postagem automática** — Worker em background com retry e lock anti-duplicação
 4. ✅ **Buscar produtos e links de afiliado** — Mercado Livre + Shopee + links de afiliado
 5. ✅ **Migrar SQLite → PostgreSQL** — SQLAlchemy ORM + Alembic + DATABASE_URL (concluído v2.5)
-6. 🔄 **Storage remoto (R2/Supabase)** — Futuro (v2.6)
+6. ✅ **Testes automatizados** — 114 testes unitários + integração (concluído v2.8)
+7. 🔄 **Storage remoto (R2/Supabase)** — Futuro (v2.6)
 
 ---
 
@@ -64,13 +65,29 @@ Automatizar uma esteira de perfis de afiliados:
 | Script backup SQLite | ✅ Completo | `scripts/backup_sqlite.py` |
 | Compatibilidade reversa | ✅ Completo | Helpers fetch_one/fetch_all mantidos |
 
+### ✅ v2.8 — Testes Automatizados
+
+| Funcionalidade | Status | Detalhes |
+|---|---|---|
+| content_generator | ✅ Completo | 8 testes: geração local, edge cases |
+| retry | ✅ Completo | 10 testes: backoff, reset, contagem |
+| video_processor | ✅ Completo | 18 testes: templates, filtros, comandos FFmpeg |
+| instagram_api | ✅ Completo | 12 testes: client, API, publish flow |
+| publisher | ✅ Completo | 6 testes: credenciais, upload, erros |
+| product_search | ✅ Completo | 7 testes: modelos, URL afiliado, busca |
+| scheduler | ✅ Completo | 10 testes: tick, due check, lock, retry |
+| repository (integration) | ✅ Completo | 20 testes: CRUD isolado (suppress_db fixture) |
+| Cobertura config | ✅ Completo | pyproject.toml com pytest + coverage |
+| Isolamento | ✅ Completo | suppress_db fixture com in-memory SQLite |
+
+**Total:** 114 testes, 0 falhas
+
 ### ❌ Não implementado
 
 | Funcionalidade | Prioridade | Planejado |
 |---|---|---|
 | Storage remoto (R2/Supabase) | Média | v2.6 |
 | Autenticação (JWT) | Média | v2.7 |
-| Testes automatizados | Média | v2.8 |
 | Observabilidade | Baixa | — |
 | Rate limiting | Baixa | — |
 | Log rotation automática | Baixa | — |

@@ -1,4 +1,4 @@
-# VideoEditorLote v2.5.0
+# VideoEditorLote v2.8.0
 
 **Editor de Vídeos em Lote** — Ferramenta de operação para afiliados.
 
@@ -248,6 +248,13 @@ PASSO 4 ──── AGENDAR E PUBLICAR ─────────────�
 - [x] Script de migração SQLite → PostgreSQL
 - [x] Script de backup do banco
 
+**Testes (v2.8):**
+- [x] 114 testes unitários + integração
+- [x] Cobertura: video_processor, publisher, scheduler, instagram_api, product_search
+- [x] Testes de banco isolados (suppress_db fixture)
+- [x] pyproject.toml com configuração pytest + coverage
+- [x] Mocks para API externa (Instagram, scraping)
+
 **Sistema:**
 - [x] Health check (FFmpeg, Gemini, Instagram)
 - [x] Configurações salvas automaticamente (30s)
@@ -257,10 +264,27 @@ PASSO 4 ──── AGENDAR E PUBLICAR ─────────────�
 ### 🔄 Próximos passos
 1. **Storage remoto** — Cloudflare R2 / Supabase (v2.6)
 2. **Autenticação** — Login, JWT, roles (v2.7)
-3. **Testes automatizados** — Unit tests para módulos core (v2.8)
-4. **Observabilidade** — Métricas, dashboard
-5. **Segurança** — Rate limiting, CORS
-6. **Melhorias** — Export CSV, duplicar post, paginação
+3. **Observabilidade** — Métricas, dashboard
+4. **Segurança** — Rate limiting, CORS
+5. **Melhorias** — Export CSV, duplicar post, paginação
+
+---
+
+## 🧪 Como rodar os testes
+
+```bash
+# Rodar todos os testes
+python -m pytest tests/ -v
+
+# Com cobertura
+python -m pytest tests/ --cov=app --cov-report=term-missing
+
+# Apenas unitários
+python -m pytest tests/unit/ -v
+
+# Apenas integração
+python -m pytest tests/integration/ -v
+```
 
 ---
 
