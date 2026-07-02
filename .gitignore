@@ -11,6 +11,9 @@ ENV/
 .env
 .venv.bak/
 
+# Coverage
+.coverage
+
 # Build artifacts
 build/
 dist/
