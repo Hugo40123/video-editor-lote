@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VideoEditorLote</title>
-    <link rel="stylesheet" href="/static/css/app.css?v=7">
+    <link rel="stylesheet" href="/static/css/app.css?v=8">
 </head>
 <body>
 
@@ -284,6 +284,36 @@
 
             <!-- ════════ TAB: POSTS (v2.3 — scheduler, histórico, status) ════════ -->
             <section id="tab-posts" class="tab-content">
+                <!-- ═══ Dashboard de Status ═══ -->
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-title">📊 Dashboard</div>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card" id="dashPendente">
+                            <div class="dashboard-number" id="dashPendenteCount">0</div>
+                            <div class="dashboard-label">Pendentes</div>
+                        </div>
+                        <div class="dashboard-card" id="dashAgendado">
+                            <div class="dashboard-number" id="dashAgendadoCount">0</div>
+                            <div class="dashboard-label">Agendados</div>
+                        </div>
+                        <div class="dashboard-card" id="dashPublicado">
+                            <div class="dashboard-number" id="dashPublicadoCount">0</div>
+                            <div class="dashboard-label">Publicados</div>
+                        </div>
+                        <div class="dashboard-card" id="dashErro">
+                            <div class="dashboard-number" id="dashErroCount">0</div>
+                            <div class="dashboard-label">Erros</div>
+                        </div>
+                        <div class="dashboard-card" id="dashTotal">
+                            <div class="dashboard-number" id="dashTotalCount">0</div>
+                            <div class="dashboard-label">Total</div>
+                        </div>
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button class="btn btn-sm btn-ghost" onclick="loadDashboardStats()">↻ Atualizar</button>
+                    </div>
+                </div>
+
                 <div class="card ig-card">
                     <div class="card-title">📱 Publicação no Instagram</div>
                     <div class="form-row">
@@ -711,6 +741,6 @@
     </div><!-- /main-area -->
 </div><!-- /app-layout -->
 
-<script src="/static/js/app.js?v=10"></script>
+<script src="/static/js/app.js?v=11"></script>
 </body>
 </html>

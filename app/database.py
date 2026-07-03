@@ -137,6 +137,9 @@ def _run_legacy_migrations() -> None:
         _migrate_sqlite_add_column(conn, "posts", "product_source", "TEXT DEFAULT ''")
         _migrate_sqlite_add_column(conn, "posts", "product_id_ref", "TEXT DEFAULT ''")
 
+        # Migration v2.9: Add scheduled_for column for scheduling
+        _migrate_sqlite_add_column(conn, "posts", "scheduled_for", "TEXT DEFAULT ''")
+
         # Migration v2.3: Update old status values to new format
         conn.execute(text("UPDATE posts SET status = 'PENDENTE' WHERE status = 'Pronto'"))
         conn.execute(text("UPDATE posts SET status = 'AGENDADO' WHERE status = 'Agendado'"))

@@ -1347,6 +1347,42 @@ select.form-input {
 
 /* ═══════════ RESPONSIVE ═══════════ */
 
+/* ═══ Dashboard ═══ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+.dashboard-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 12px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.dashboard-card:hover {
+    border-color: var(--border-light);
+}
+.dashboard-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+.dashboard-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+#dashPendente .dashboard-number { color: var(--text-secondary); }
+#dashAgendado .dashboard-number { color: var(--amber); }
+#dashPublicado .dashboard-number { color: var(--green); }
+#dashErro .dashboard-number { color: var(--red); }
+#dashTotal .dashboard-number { color: var(--accent); }
+
 @media (max-width: 1100px) {
     .editor-grid { grid-template-columns: 1fr; }
     .content-grid-main { grid-template-columns: 1fr; }

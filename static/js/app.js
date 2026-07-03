@@ -55,7 +55,7 @@ function switchTab(tab) {
     const el = document.getElementById(`tab-${tab}`);
     if (el) el.classList.add('active');
     STATE.tab = tab;
-    if (tab === 'posts') { loadPostQueue(); loadOutputVideos(); }
+    if (tab === 'posts') { loadPostQueue(); loadOutputVideos(); loadDashboardStats(); }
     if (tab === 'content') { loadPostQueue(); }
     if (tab === 'products') { loadLinkedProducts(); updateProductPostSelect(); loadAffiliateIds(); }
     if (tab === 'settings') { loadQueueStats(); checkFfmpeg(); loadSettings(); }
@@ -1239,6 +1239,18 @@ async function loadQueueStats() {
         document.getElementById('queueAgendado').textContent = bs['AGENDADO'] || '0';
         document.getElementById('queuePublicado').textContent = bs['PUBLICADO'] || '0';
         document.getElementById('queueErro').textContent = bs['ERRO'] || '0';
+    } catch {}
+}
+
+async function loadDashboardStats() {
+    try {
+        const d = await api('/api/posts/stats/summary');
+        const bs = d.by_status || {};
+        document.getElementById('dashTotalCount').textContent = d.total || '0';
+        document.getElementById('dashPendenteCount').textContent = bs['PENDENTE'] || '0';
+        document.getElementById('dashAgendadoCount').textContent = bs['AGENDADO'] || '0';
+        document.getElementById('dashPublicadoCount').textContent = bs['PUBLICADO'] || '0';
+        document.getElementById('dashErroCount').textContent = bs['ERRO'] || '0';
     } catch {}
 }
 
