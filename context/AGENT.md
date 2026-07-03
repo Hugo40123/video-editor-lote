@@ -121,6 +121,7 @@ A fila limpa posts orfaos (arquivos deletados) ao carregar.
   1. Commitar as mudanças no git com mensagem descritiva em inglês
   2. Atualizar os arquivos da pasta `context/` se houver mudanças na arquitetura, convenções ou decisões
   3. Executar `iniciar.bat` automaticamente ao finalizar para validar
+- **Todo commit deve ser enviado ao GitHub** (git push) automaticamente
 
 ## Cuidados ao Modificar
 
