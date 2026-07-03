@@ -841,6 +841,8 @@ select.form-input {
 .log-entry.success { color: var(--green); }
 .log-entry.info { color: var(--blue); }
 .log-entry.warning { color: var(--amber); }
+.log-download-link { color: var(--accent); text-decoration: underline; cursor: pointer; font-weight: 600; }
+.log-download-link:hover { color: var(--accent-hover); }
 
 /* ═══════════ PROGRESS ═══════════ */
 

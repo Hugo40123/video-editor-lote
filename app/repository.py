@@ -41,6 +41,29 @@ def list_posts() -> list[dict[str, Any]]:
     try:
         posts = session.query(Post).order_by(Post.updated_at.desc()).all()
         return [_post_to_dict(p) for p in posts]
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def cleanup_orphan_posts() -> int:
+    """Remove posts whose video files no longer exist. Returns count removed."""
+    session = get_session()
+    try:
+        posts = session.query(Post).all()
+        removed = 0
+        for p in posts:
+            if p.video_path and not Path(p.video_path).is_file():
+                session.delete(p)
+                removed += 1
+        if removed:
+            session.commit()
+        return removed
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
 

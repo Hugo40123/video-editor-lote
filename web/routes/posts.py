@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.instagram_api import DEFAULT_API_VERSION
 from app.repository import (
     add_videos_to_queue,
+    cleanup_orphan_posts,
     clean_worker_logs,
     create_post,
     delete_post,
@@ -285,3 +286,10 @@ async def maintenance_reset_stuck() -> dict[str, Any]:
     """Reset posts stuck in PROCESSANDO status."""
     unstuck = reset_stuck_posts()
     return {"unstuck": unstuck}
+
+
+@router.post("/maintenance/cleanup-orphans")
+async def maintenance_cleanup_orphans() -> dict[str, Any]:
+    """Remove posts whose video files no longer exist."""
+    removed = cleanup_orphan_posts()
+    return {"removed": removed, "total": len(list_posts())}

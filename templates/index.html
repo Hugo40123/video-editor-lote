@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VideoEditorLote</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/app.css?v=7">
 </head>
 <body>
 
@@ -44,7 +44,7 @@
 
         <header class="topbar">
             <span class="topbar-title">Editor de Vídeos em Lote</span>
-            <span class="topbar-badge">v2.0</span>
+            <span class="topbar-badge">v2.9</span>
             <div class="topbar-spacer"></div>
             <button class="topbar-action" onclick="refreshAll()">🔄 Recarregar</button>
         </header>
@@ -578,38 +578,73 @@
                     </div>
 
                     <div class="card">
-                        <div class="card-title">🤖 Google Gemini (IA)</div>
+                        <div class="card-title">🤖 IA para Legendas</div>
                         <div class="form-group">
-                            <label>🔑 Chave da API</label>
-                            <input type="password" id="settingsGeminiKey" class="form-input" placeholder="Cole sua chave do Google AI Studio">
-                        </div>
-                        <div class="form-group">
-                            <label>Modelo</label>
-                            <select id="settingsGeminiModel" class="form-input">
-                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (recomendado)</option>
-                                <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <label>Provider</label>
+                            <select id="aiProvider" class="form-input" onchange="toggleAiProvider()">
+                                <option value="groq">Groq (Recomendado - Gratis)</option>
+                                <option value="gemini">Google Gemini</option>
                             </select>
                         </div>
-                        <div class="setting-row" style="border-bottom:none;">
-                            <span class="setting-label">Status</span>
-                            <span class="setting-value" id="settingsGeminiStatus" style="font-size:12px;">Não configurado</span>
+
+                        <!-- Groq Config -->
+                        <div id="groqConfig">
+                            <div class="form-group">
+                                <label>Groq API Key</label>
+                                <input type="password" id="settingsGroqKey" class="form-input" placeholder="gsk_...">
+                            </div>
+                            <div class="form-group">
+                                <label>Modelo LLM</label>
+                                <select id="settingsGroqModel" class="form-input">
+                                    <option value="llama-3.1-8b-instant">Llama 3.1 8B (rapido)</option>
+                                    <option value="llama-3.3-70b-versatile">Llama 3.3 70B (melhor qualidade)</option>
+                                    <option value="mixtral-8b-32768">Mixtral 8B</option>
+                                </select>
+                            </div>
+                            <div class="setting-row" style="border-bottom:none;">
+                                <span class="setting-label">Status</span>
+                                <span class="setting-value" id="settingsGroqStatus" style="font-size:12px;">Nao configurado</span>
+                            </div>
+                            <div class="btn-row">
+                                <button class="btn btn-sm btn-primary" onclick="saveGroqSettings()">Salvar</button>
+                                <button class="btn btn-sm btn-ghost" onclick="testGroqFromSettings()">Testar conexao</button>
+                            </div>
+                            <details style="margin-top:12px;font-size:12px;color:var(--text-dim);">
+                                <summary style="cursor:pointer;color:var(--text-secondary);">Como obter a chave Groq</summary>
+                                <ol style="margin-top:8px;padding-left:18px;line-height:1.8;">
+                                    <li>Acesse <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com/keys</a></li>
+                                    <li>Faca login com Google/GitHub</li>
+                                    <li>Clique em "Create API Key"</li>
+                                    <li>Cole a chave (comeca com gsk_...) acima</li>
+                                    <li>Gratis: 30 req/min, 14.400 req/dia</li>
+                                </ol>
+                            </details>
                         </div>
-                        <div class="btn-row">
-                            <button class="btn btn-sm btn-primary" onclick="saveGeminiSettings()">💾 Salvar</button>
-                            <button class="btn btn-sm btn-ghost" onclick="testGeminiFromSettings()">🔄 Testar conexão</button>
+
+                        <!-- Gemini Config -->
+                        <div id="geminiConfig" style="display:none;">
+                            <div class="form-group">
+                                <label>Gemini API Key</label>
+                                <input type="password" id="settingsGeminiKey" class="form-input" placeholder="Cole sua chave do Google AI Studio">
+                            </div>
+                            <div class="form-group">
+                                <label>Modelo</label>
+                                <select id="settingsGeminiModel" class="form-input">
+                                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                </select>
+                            </div>
+                            <div class="setting-row" style="border-bottom:none;">
+                                <span class="setting-label">Status</span>
+                                <span class="setting-value" id="settingsGeminiStatus" style="font-size:12px;">Nao configurado</span>
+                            </div>
+                            <div class="btn-row">
+                                <button class="btn btn-sm btn-primary" onclick="saveGeminiSettings()">Salvar</button>
+                                <button class="btn btn-sm btn-ghost" onclick="testGeminiFromSettings()">Testar conexao</button>
+                            </div>
                         </div>
-                        <details style="margin-top:12px;font-size:12px;color:var(--text-dim);">
-                            <summary style="cursor:pointer;color:var(--text-secondary);">📖 Como obter a chave da API</summary>
-                            <ol style="margin-top:8px;padding-left:18px;line-height:1.8;">
-                                <li>Acesse <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a></li>
-                                <li>Clique em <strong>"Criar chave de API"</strong></li>
-                                <li>Copie a chave gerada (começa com <code>AIza...</code>)</li>
-                                <li>Cole no campo acima e clique em <strong>"Salvar"</strong></li>
-                                <li>O tier gratuito inclui 1.500 requisições/dia no modelo Flash</li>
-                            </ol>
-                        </details>
                     </div>
 
                     <div class="card">
@@ -676,6 +711,6 @@
     </div><!-- /main-area -->
 </div><!-- /app-layout -->
 
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v=9"></script>
 </body>
 </html>

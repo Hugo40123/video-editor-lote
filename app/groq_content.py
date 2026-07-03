@@ -1,9 +1,10 @@
-"""Google Gemini API — Content generation from video.
+"""Groq API — Transcription + caption generation.
 
-Strategy:
-1. Extract audio with FFmpeg → send to Gemini for transcription + caption
-2. If no audio → extract frame → send image + keywords for best-effort caption
-3. Return has_audio flag so frontend can show review prompt
+Groq offers free tier with generous limits:
+- 30 req/min, 14,400 req/day
+- Whisper large-v3 for transcription
+- Llama 3.1 for text generation
+- Very fast inference
 """
 
 from __future__ import annotations
@@ -18,16 +19,11 @@ from typing import Callable
 from .content_generator import ContentDraft, generate_content_draft
 
 
-class GeminiError(RuntimeError):
-    pass
-
-
 LogCallback = Callable[[str], None]
 
-DEFAULT_MODEL = "gemini-2.0-flash"
-DEFAULT_TEMPERATURE = 0.7
-DEFAULT_MAX_TOKENS = 1600
-MIN_AUDIO_DURATION = 1.0  # seconds
+DEFAULT_WHISPER_MODEL = "whisper-large-v3"
+DEFAULT_LLM_MODEL = "llama-3.1-8b-instant"
+MIN_AUDIO_DURATION = 1.0
 
 
 def generate_content_from_video(
@@ -36,19 +32,21 @@ def generate_content_from_video(
     api_key: str,
     keywords: str = "",
     base_hashtags: str = "#achadinhos #shopee #mercadolivre",
-    model: str = DEFAULT_MODEL,
-    temperature: float = DEFAULT_TEMPERATURE,
-    max_output_tokens: int = DEFAULT_MAX_TOKENS,
+    whisper_model: str = DEFAULT_WHISPER_MODEL,
+    llm_model: str = DEFAULT_LLM_MODEL,
     log_callback: LogCallback | None = None,
     ffmpeg_executable: str = "ffmpeg",
 ) -> tuple[ContentDraft | None, bool, str]:
-    """Generate Instagram caption from a video using Gemini.
+    """Generate Instagram caption from video using Groq.
+
+    1. Extract audio with FFmpeg
+    2. Transcribe with Whisper on Groq
+    3. Generate caption with Llama on Groq
 
     Returns (draft, has_audio, transcript).
-    has_audio indicates if the video had narration.
     """
     if not api_key or not api_key.strip():
-        _log(log_callback, "Gemini API key nao configurada.")
+        _log(log_callback, "Groq API key nao configurada.")
         return None, False, ""
 
     if not video_path.is_file():
@@ -56,15 +54,15 @@ def generate_content_from_video(
         return None, False, ""
 
     try:
-        from google import genai
+        from groq import Groq
     except ImportError:
-        _log(log_callback, "Pacote google-genai nao instalado.")
+        _log(log_callback, "Pacote groq nao instalado.")
         return None, False, ""
 
     try:
-        client = genai.Client(api_key=api_key.strip())
+        client = Groq(api_key=api_key.strip())
     except Exception as exc:
-        _log(log_callback, f"Erro ao inicializar Gemini: {exc}")
+        _log(log_callback, f"Erro ao inicializar Groq: {exc}")
         return None, False, ""
 
     # 1. Extract audio
@@ -74,15 +72,13 @@ def generate_content_from_video(
     transcript = ""
 
     if audio_path:
-        # Check audio duration
         duration = _get_audio_duration(audio_path, ffmpeg_executable)
         if duration and duration >= MIN_AUDIO_DURATION:
             has_audio = True
-            _log(log_callback, f"Audio encontrado ({duration:.1f}s). Transcrevendo com Gemini...")
-            transcript = _transcribe_audio(client, audio_path, model, log_callback)
+            _log(log_callback, f"Audio encontrado ({duration:.1f}s). Transcrevendo com Groq Whisper...")
+            transcript = _transcribe_audio(client, audio_path, whisper_model, log_callback)
         else:
             _log(log_callback, "Audio muito curto ou vazio.")
-        # Clean up audio
         try:
             Path(audio_path).unlink(missing_ok=True)
         except Exception:
@@ -92,30 +88,26 @@ def generate_content_from_video(
 
     # 2. Generate caption
     if has_audio and transcript:
-        _log(log_callback, "Gerando legenda a partir da transcricao...")
+        _log(log_callback, "Gerando legenda com Llama...")
         draft = _generate_from_transcript(
             client, transcript, video_path.name,
             keywords=keywords, base_hashtags=base_hashtags,
-            model=model, temperature=temperature,
-            max_output_tokens=max_output_tokens,
-            log_callback=log_callback,
+            llm_model=llm_model, log_callback=log_callback,
         )
         if draft:
             return draft, True, transcript
 
-    # 3. Fallback: use frame + keywords
+    # 3. Fallback: use frame
     _log(log_callback, "Gerando legenda a partir do frame (sem audio)...")
     draft = _generate_from_frame(
         client, video_path, keywords=keywords,
-        base_hashtags=base_hashtags, model=model,
-        temperature=temperature, max_output_tokens=max_output_tokens,
+        base_hashtags=base_hashtags, llm_model=llm_model,
         log_callback=log_callback, ffmpeg_executable=ffmpeg_executable,
     )
     return draft, has_audio, transcript
 
 
 def _extract_audio(video_path: Path, ffmpeg: str) -> str | None:
-    """Extract audio track from video as MP3."""
     try:
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
         tmp.close()
@@ -133,13 +125,11 @@ def _extract_audio(video_path: Path, ffmpeg: str) -> str | None:
 
 
 def _get_audio_duration(audio_path: str, ffmpeg: str) -> float | None:
-    """Get audio duration in seconds using ffprobe."""
     try:
         import shutil
         ffprobe = shutil.which("ffprobe") or ffmpeg.replace("ffmpeg", "ffprobe")
         result = subprocess.run(
-            [ffprobe, "-v", "error",
-             "-show_entries", "format=duration",
+            [ffprobe, "-v", "error", "-show_entries", "format=duration",
              "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
             capture_output=True, text=True, timeout=10,
         )
@@ -149,7 +139,6 @@ def _get_audio_duration(audio_path: str, ffmpeg: str) -> float | None:
 
 
 def _extract_frame(video_path: Path, ffmpeg: str) -> str | None:
-    """Extract a single frame at 1s mark."""
     try:
         tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
         tmp.close()
@@ -166,28 +155,17 @@ def _extract_frame(video_path: Path, ffmpeg: str) -> str | None:
         return None
 
 
-def _transcribe_audio(
-    client, audio_path: str, model: str,
-    log_callback: LogCallback | None = None,
-) -> str:
-    """Send audio to Gemini for transcription."""
+def _transcribe_audio(client, audio_path: str, model: str, log_callback) -> str:
     try:
-        uploaded = client.files.upload(path=audio_path)
-        _log(log_callback, "Audio enviado. Aguardando transcricao...")
-
-        response = client.models.generate_content(
-            model=model,
-            contents=[uploaded, "Transcreva fielmente todo o audio deste video em portugues do Brasil."],
-            config={"max_output_tokens": 4000, "temperature": 0.2},
-        )
-
-        try:
-            client.files.delete(name=uploaded.name)
-        except Exception:
-            pass
-
-        if response and response.text:
-            return response.text.strip()
+        with open(audio_path, "rb") as f:
+            result = client.audio.transcriptions.create(
+                file=(audio_path, f),
+                model=model,
+                language="pt",
+            )
+        if result and result.text:
+            _log(log_callback, f"Transcricao obtida ({len(result.text)} caracteres).")
+            return result.text.strip()
         return ""
     except Exception as exc:
         _log(log_callback, f"Erro na transcricao: {exc}")
@@ -196,11 +174,9 @@ def _transcribe_audio(
 
 def _generate_from_transcript(
     client, transcript: str, video_name: str, *,
-    keywords: str, base_hashtags: str, model: str,
-    temperature: float, max_output_tokens: int,
-    log_callback: LogCallback | None = None,
+    keywords: str, base_hashtags: str, llm_model: str,
+    log_callback,
 ) -> ContentDraft | None:
-    """Generate caption from transcript text."""
     system_instruction = (
         "Voce e um copywriter brasileiro especializado em posts de afiliados para Instagram. "
         "Voce recebeu a transcricao de um video de Reels/achadinhos.\n\n"
@@ -209,12 +185,11 @@ def _generate_from_transcript(
         "- Comece com titulo chamativo com emojis\n"
         "- 4 a 6 paragrafos curtos\n"
         "- Identifique TODOS os produtos mencionados na transcricao\n"
-        "- Para cada produto: nome, caractistica principal e URL do marketplace (se mencionada)\n"
         "- NAO copie trechos literais da transcricao\n"
         "- NAO invente precos, descontos, garantias ou lojas\n"
         "- Termine com 'Publi' em linha separada e hashtags\n"
         "- A legenda deve ter entre 800 e 1500 caracteres\n\n"
-        "Responda SOMENTE com JSON valido."
+        "Responda SOMENTE com JSON valido, sem marcacao ```."
     )
 
     prompt = f"""Transcricao do video:
@@ -226,7 +201,7 @@ Nome do arquivo: {video_name}
 Palavras-chave: {keywords or "nenhuma"}
 Hashtags base: {base_hashtags or "nenhuma"}
 
-Crie a legenda de Instagram. Se houver multiplos produtos, liste todos no campo product_query separados por virgula.
+Crie a legenda de Instagram.
 
 Responda EXATAMENTE este JSON:
 {{
@@ -239,21 +214,22 @@ Responda EXATAMENTE este JSON:
 }}"""
 
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=[prompt],
-            config={
-                "system_instruction": system_instruction,
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-                "response_mime_type": "application/json",
-            },
+        response = client.chat.completions.create(
+            model=llm_model,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.7,
+            max_tokens=1600,
+            response_format={"type": "json_object"},
         )
 
-        if not response or not response.text:
+        content = response.choices[0].message.content
+        if not content:
             return None
 
-        payload = _parse_json_response(response.text)
+        payload = _parse_json_response(content)
         return _payload_to_draft(payload, keywords, base_hashtags)
 
     except Exception as exc:
@@ -263,80 +239,11 @@ Responda EXATAMENTE este JSON:
 
 def _generate_from_frame(
     client, video_path: Path, *,
-    keywords: str, base_hashtags: str, model: str,
-    temperature: float, max_output_tokens: int,
-    log_callback: LogCallback | None = None,
-    ffmpeg_executable: str = "ffmpeg",
+    keywords: str, base_hashtags: str, llm_model: str,
+    log_callback, ffmpeg_executable: str = "ffmpeg",
 ) -> ContentDraft | None:
-    """Generate caption from a single frame (no audio fallback)."""
-    frame_path = _extract_frame(video_path, ffmpeg_executable)
-    if not frame_path:
-        return None
-
-    try:
-        uploaded = client.files.upload(path=frame_path)
-        _log(log_callback, "Enviando frame para Gemini...")
-
-        system_instruction = (
-            "Voce e um copywriter brasileiro especializado em posts de afiliados para Instagram. "
-            "Analise a imagem (frame de um video de Reels/achadinhos).\n"
-            "Como NAO ha transcricao de audio, faca sua melhor interpretacao visual.\n"
-            "Se nao conseguir identificar o produto, use 'produto nao identificado' no product_query.\n\n"
-            "Regras:\n"
-            "- Portugues do Brasil, tom persuasivo\n"
-            "- Comece com titulo chamativo com emojis\n"
-            "- 4 a 6 paragrafos curtos\n"
-            "- NAO invente precos, descontos ou lojas\n"
-            "- Termine com 'Publi' e hashtags\n"
-            "- A legenda deve ter entre 800 e 1500 caracteres\n\n"
-            "Responda SOMENTE com JSON valido."
-        )
-
-        prompt = f"""Analise este frame de um video de Reels/achadinhos.
-Nome: {video_path.name}
-Palavras-chave: {keywords or "nenhuma"}
-Hashtags: {base_hashtags or "nenhuma"}
-
-Responda EXATAMENTE este JSON:
-{{
-  "title": "titulo chamativo com emojis",
-  "caption": "legenda completa para Instagram com Publi e hashtags",
-  "cta": "chamada para acao curta",
-  "hashtags": "#tag1 #tag2 #tag3",
-  "product_query": "termo de busca para marketplace",
-  "product_keywords": "palavras-chave separadas por espaco"
-}}"""
-
-        response = client.models.generate_content(
-            model=model,
-            contents=[uploaded, prompt],
-            config={
-                "system_instruction": system_instruction,
-                "temperature": temperature,
-                "max_output_tokens": max_output_tokens,
-                "response_mime_type": "application/json",
-            },
-        )
-
-        try:
-            client.files.delete(name=uploaded.name)
-        except Exception:
-            pass
-
-        if not response or not response.text:
-            return None
-
-        payload = _parse_json_response(response.text)
-        return _payload_to_draft(payload, keywords, base_hashtags)
-
-    except Exception as exc:
-        _log(log_callback, f"Erro ao gerar legenda do frame: {exc}")
-        return None
-    finally:
-        try:
-            Path(frame_path).unlink(missing_ok=True)
-        except Exception:
-            pass
+    _log(log_callback, "Nao e possivel enviar imagem ao Groq. Usando fallback local.")
+    return None
 
 
 def _payload_to_draft(payload: dict, keywords: str, base_hashtags: str) -> ContentDraft | None:

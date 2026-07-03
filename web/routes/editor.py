@@ -447,10 +447,10 @@ async def check_ffmpeg() -> dict[str, Any]:
 @router.get("/default-paths")
 async def default_paths() -> dict[str, str]:
     return {
-        "input_folder": str(default_input_dir()),
-        "output_folder": str(default_output_dir()),
+        "input_folder": "entrada (pasta interna do servidor)",
+        "output_folder": "saida (pasta interna do servidor)",
         "background_image": str(default_background_path()),
-        "upload_dir": str(upload_dir()),
+        "upload_dir": "uploads (pasta interna do servidor)",
     }
 
 

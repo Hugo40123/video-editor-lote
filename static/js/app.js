@@ -33,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     loadDbPath();
     loadSchedulerStatus();
-    updatePreview();
+    // Load default background image into preview
+    loadBgImage('/assets/fundo_padrao.jpg');
+    drawPreview();
 });
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -211,12 +213,18 @@ async function uploadImage(file, type) {
         if (type === 'bg') {
             STATE.uploadedBgImage = d;
             document.getElementById('bgImageName').textContent = `🖼️ ${d.original_name} (${d.size_mb} MB)`;
+            // Load background image into preview cache
+            const sessionMatch = d.server_path.match(/uploads[/\\]([^/\\]+)[/\\]/);
+            if (sessionMatch) {
+                const fname = d.server_path.split(/[/\\]/).pop();
+                loadBgImage(`/uploads/${sessionMatch[1]}/${encodeURIComponent(fname)}`);
+            }
         } else {
             STATE.uploadedLogoImage = d;
             document.getElementById('logoImageName').textContent = `©️ ${d.original_name} (${d.size_mb} MB)`;
         }
         toast(`${type === 'bg' ? 'Fundo' : 'Logo'} atualizado!`, 'success');
-        updatePreview();
+        drawPreview();
     } catch (err) {
         toast(`Erro ao enviar imagem: ${err.message}`, 'error');
     }
@@ -226,8 +234,8 @@ function resetImages() {
     STATE.uploadedBgImage = null;
     STATE.uploadedLogoImage = null;
     document.getElementById('bgImageName').textContent = '📷 Padrão (assets/fundo_padrao.jpg)';
-    document.getElementById('logoImageName').textContent = '📷 Padrão (assets/logo_padrao.png)';
-    updatePreview();
+        document.getElementById('logoImageName').textContent = '📷 Padrão (assets/logo_padrao.png)';
+    drawPreview();
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -258,7 +266,27 @@ function updateSlider(inputId, displayId, s) {
 let _ps = false;
 function schedulePreview() {
     if (_ps) return; _ps = true;
-    setTimeout(() => { _ps = false; updatePreview(); }, 120);
+    setTimeout(() => { _ps = false; drawPreview(); }, 120);
+}
+
+// Loaded images for preview
+let _bgImg = null;
+let _thumbImg = null;
+
+function loadBgImage(src) {
+    if (!src) return;
+    const img = new Image();
+    img.onload = () => { _bgImg = img; drawPreview(); };
+    img.onerror = () => { _bgImg = null; drawPreview(); };
+    img.src = src;
+}
+
+function loadThumbImage(src) {
+    if (!src) { _thumbImg = null; drawPreview(); return; }
+    const img = new Image();
+    img.onload = () => { _thumbImg = img; drawPreview(); };
+    img.onerror = () => { _thumbImg = null; drawPreview(); };
+    img.src = src;
 }
 
 async function refreshPreview(videoPath) {
@@ -275,23 +303,30 @@ async function refreshPreview(videoPath) {
             method: 'POST',
             body: JSON.stringify({ video_path: videoPath })
         });
-        if (d.thumbnail) STATE.currentThumbnail = d.thumbnail;
+        if (d.thumbnail) {
+            STATE.currentThumbnail = d.thumbnail;
+            loadThumbImage(d.thumbnail);
+        } else {
+            _thumbImg = null;
+            drawPreview();
+        }
         if (d.video_name) STATE.currentVideoName = d.video_name;
         document.getElementById('previewVideoName').textContent =
-            `${d.video_name || 'Vídeo'} — ${STATE.uploadedVideos.length} enviado(s)`;
-    } catch {
+            `${d.video_name || 'Video'} - ${STATE.uploadedVideos.length} enviado(s)`;
+    } catch (e) {
+        _thumbImg = null;
+        drawPreview();
         document.getElementById('previewVideoName').textContent =
-            `${STATE.uploadedVideos.length} vídeo(s) enviado(s)`;
+            `${STATE.uploadedVideos.length} video(s) enviado(s)`;
     }
-
-    updatePreview();
 }
 
 function clearPreview() {
     STATE.currentThumbnail = null;
     STATE.currentVideoName = null;
-    document.getElementById('previewVideoName').textContent = 'Nenhum vídeo enviado';
-    updatePreview();
+    _thumbImg = null;
+    document.getElementById('previewVideoName').textContent = 'Nenhum video enviado';
+    drawPreview();
 }
 
 function resetPreview() {
@@ -301,78 +336,134 @@ function resetPreview() {
     updateSlider('videoWidth', 'videoWidthVal', '%');
     ['videoOffsetX', 'videoOffsetY', 'textMarkOffsetX', 'textMarkOffsetY']
         .forEach(id => updateSlider(id, id.replace('video', '').replace('text', '') + 'Val', ' px'));
-    updatePreview();
+    drawPreview();
 }
 
-function updatePreview() {
+function drawPreview() {
     const canvas = document.getElementById('previewCanvas');
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    const pad = 6, sc = Math.min((W - pad*2)/1080, (H - pad*2)/1920);
-    const pw = Math.round(1080*sc), ph = Math.round(1920*sc), ox = Math.round((W-pw)/2), oy = Math.round((H-ph)/2);
+    const pad = 6;
+    const sc = Math.min((W - pad * 2) / 1080, (H - pad * 2) / 1920);
+    const pw = Math.round(1080 * sc);
+    const ph = Math.round(1920 * sc);
+    const ox = Math.round((W - pw) / 2);
+    const oy = Math.round((H - ph) / 2);
 
-    // Background
+    // 1) Background
     ctx.fillStyle = '#0A0A12';
     ctx.fillRect(0, 0, W, H);
+
+    if (_bgImg && _bgImg.complete && _bgImg.naturalWidth > 0) {
+        try {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(ox, oy, pw, ph);
+            ctx.clip();
+            const imgR = _bgImg.naturalWidth / _bgImg.naturalHeight;
+            const canR = pw / ph;
+            let dw, dh, ddx, ddy;
+            if (imgR > canR) { dh = ph; dw = Math.round(ph * imgR); }
+            else { dw = pw; dh = Math.round(pw / imgR); }
+            ddx = ox + Math.round((pw - dw) / 2);
+            ddy = oy + Math.round((ph - dh) / 2);
+            ctx.drawImage(_bgImg, ddx, ddy, dw, dh);
+            ctx.restore();
+        } catch (e) {}
+    }
+
     ctx.strokeStyle = '#2A2A3A';
+    ctx.lineWidth = 1;
     ctx.strokeRect(ox, oy, pw, ph);
 
-    // Video area
+    // 2) Video area
     const vs = +g('videoSize') || 100;
     const vw = +g('videoWidth') || 100;
-    const vwi = Math.round(900*vs/100*vw/100*sc);
-    const vhi = Math.round(1460*vs/100*sc);
+    const vwi = Math.round(900 * vs / 100 * vw / 100 * sc);
+    const vhi = Math.round(1460 * vs / 100 * sc);
     const vx = +g('videoOffsetX') || 0;
     const vy = +g('videoOffsetY') || 0;
-    const vcx = Math.round(ox+(pw-vwi)/2+vx*sc);
-    const vcy = Math.round(oy+(ph-vhi)/2+vy*sc);
+    const vcx = Math.round(ox + (pw - vwi) / 2 + vx * sc);
+    const vcy = Math.round(oy + (ph - vhi) / 2 + vy * sc);
 
-    ctx.fillStyle = '#1A1A2E';
-    ctx.beginPath();
-    ctx.roundRect(vcx, vcy, vwi, vhi, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#6C63FF'; ctx.lineWidth = 1.5;
+    if (_thumbImg && _thumbImg.complete && _thumbImg.naturalWidth > 0) {
+        try {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(vcx, vcy, vwi, vhi, 4);
+            ctx.clip();
+            const tR = _thumbImg.naturalWidth / _thumbImg.naturalHeight;
+            const vR = vwi / vhi;
+            let tw, th, ttx, tty;
+            if (tR > vR) { th = vhi; tw = Math.round(vhi * tR); }
+            else { tw = vwi; th = Math.round(vwi / tR); }
+            ttx = vcx + Math.round((vwi - tw) / 2);
+            tty = vcy + Math.round((vhi - th) / 2);
+            ctx.drawImage(_thumbImg, ttx, tty, tw, th);
+            ctx.restore();
+        } catch (e) {
+            // Fallback: draw placeholder
+            ctx.fillStyle = '#1A1A2E';
+            ctx.beginPath(); ctx.roundRect(vcx, vcy, vwi, vhi, 4); ctx.fill();
+        }
+    } else {
+        ctx.fillStyle = '#1A1A2E';
+        ctx.beginPath(); ctx.roundRect(vcx, vcy, vwi, vhi, 4); ctx.fill();
+        ctx.fillStyle = '#9090A8';
+        ctx.font = 'bold 8px Inter,sans-serif';
+        ctx.textAlign = 'center';
+        const label = STATE.currentVideoName || 'video';
+        const shortName = label.length > 18 ? label.substring(0, 16) + '...' : label;
+        ctx.fillText('\u{1F3AC} ' + shortName, vcx + vwi / 2, vcy + vhi / 2 + 3);
+    }
+
+    ctx.strokeStyle = '#6C63FF';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.roundRect(vcx, vcy, vwi, vhi, 4);
     ctx.stroke();
 
-    ctx.fillStyle = '#9090A8'; ctx.font = 'bold 8px Inter,sans-serif'; ctx.textAlign = 'center';
-    const label = STATE.currentVideoName || 'video';
-    const shortName = label.length > 18 ? label.substring(0, 16) + '...' : label;
-    ctx.fillText('\u{1F3AC} ' + shortName, vcx+vwi/2, vcy+vhi/2+3);
-
-    // Watermark mask
+    // 3) Watermark mask
     if (cb('removeWatermark')) {
-        const dx = +g('delogoX')||190, dy = +g('delogoY')||860;
-        const dw = +g('delogoWidth')||700, dh = +g('delogoHeight')||160;
-        ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 1.5; ctx.setLineDash([3,3]);
-        ctx.strokeRect(ox+dx*sc, oy+dy*sc, dw*sc, dh*sc);
-        ctx.setLineDash([]); ctx.fillStyle = '#F6C06A'; ctx.font = '6px Inter,sans-serif';
-        ctx.fillText('area ocultada', ox+dx*sc+dw*sc/2, Math.max(oy+6, oy+dy*sc-2));
+        const dx = +g('delogoX') || 190, dy = +g('delogoY') || 860;
+        const dw = +g('delogoWidth') || 700, dh = +g('delogoHeight') || 160;
+        ctx.strokeStyle = '#F59E0B';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(ox + dx * sc, oy + dy * sc, dw * sc, dh * sc);
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#F6C06A';
+        ctx.font = '6px Inter,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('area ocultada', ox + dx * sc + dw * sc / 2, Math.max(oy + 6, oy + dy * sc - 2));
     }
 
-    // Logo
+    // 4) Logo
     if (cb('applyLogo')) {
-        const lw = Math.round(180*sc), lh = Math.round(78*sc);
+        const lw = Math.round(180 * sc), lh = Math.round(78 * sc);
         ctx.fillStyle = '#E8E8F0';
-        ctx.fillRect(ox+pw-lw-40*sc, oy+ph-lh-40*sc, lw, lh);
-        ctx.fillStyle = '#0A0A12'; ctx.font = 'bold 6px Inter,sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('LOGO', ox+pw-lw/2-40*sc, oy+ph-lh/2-40*sc+2);
+        ctx.fillRect(ox + pw - lw - 40 * sc, oy + ph - lh - 40 * sc, lw, lh);
+        ctx.fillStyle = '#0A0A12';
+        ctx.font = 'bold 6px Inter,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('LOGO', ox + pw - lw / 2 - 40 * sc, oy + ph - lh / 2 - 40 * sc + 2);
     }
 
-    // @ text
+    // 5) @ text
     if (cb('applyTextMark')) {
         const txt = g('textMark').trim() || '@marca';
         const fs = +g('textMarkSize') || 76;
-        const tx = +g('textMarkOffsetX') || 0, ty = +g('textMarkOffsetY') || 0;
-        const fz = Math.max(7, Math.min(16, fs*sc*1.4));
-        ctx.font = `bold ${fz}px Inter,sans-serif`; ctx.textAlign = 'center';
+        const mtx = +g('textMarkOffsetX') || 0, mty = +g('textMarkOffsetY') || 0;
+        const fz = Math.max(7, Math.min(16, fs * sc * 1.4));
+        ctx.font = 'bold ' + fz + 'px Inter,sans-serif';
+        ctx.textAlign = 'center';
         ctx.fillStyle = '#1D2430';
-        ctx.fillText(txt, ox+pw/2+tx*sc+1, oy+ph/2+ty*sc+1);
+        ctx.fillText(txt, ox + pw / 2 + mtx * sc + 1, oy + ph / 2 + mty * sc + 1);
         ctx.fillStyle = '#B8C7DA';
-        ctx.fillText(txt, ox+pw/2+tx*sc, oy+ph/2+ty*sc);
+        ctx.fillText(txt, ox + pw / 2 + mtx * sc, oy + ph / 2 + mty * sc);
     }
 }
 
@@ -492,7 +583,7 @@ function listenToStream(taskId) {
             else if (d.type === 'complete') {
                 es.close();
                 const btn = document.getElementById('processBtn');
-                btn.disabled = false; btn.textContent = '▶ Gerar vídeos';
+                btn.disabled = false; btn.textContent = '\u25B6 Gerar v\u00eddeos';
                 ind.classList.remove('active');
                 if (d.summary.error) {
                     logLine(log, `Erro: ${d.summary.error}`, 'error');
@@ -507,13 +598,29 @@ function listenToStream(taskId) {
                         logLine(log, 'Links para download:', 'info');
                         d.summary.output_files.forEach((fp, i) => {
                             const fname = fp.split(/[/\\\\]/).pop();
-                            logLine(log, `  ${i+1}. ${fname} — /output/${fname}`, 'info');
+                            const url = `/output/${encodeURIComponent(fname)}`;
+                            logLineHtml(log, `  ${i+1}. <a href="${url}" download class="log-download-link">${fname}</a>`, 'info');
                         });
-                        toast('Clique nos nomes acima para baixar!', 'success');
+                    }
+
+                    // Auto-add output videos to the post queue (async, not awaited in onmessage)
+                    if (d.summary.output_files?.length) {
+                        api('/api/posts', {
+                            method: 'POST',
+                            body: JSON.stringify({ video_paths: d.summary.output_files }),
+                        }).then(result => {
+                            if (result.added > 0) toast(`${result.added} video(s) adicionado(s) a fila!`, 'success');
+                        }).catch(() => {});
                     }
 
                     loadOutputVideos();
                     loadPostQueue();
+
+                    // Auto-switch to content tab
+                    setTimeout(() => {
+                        switchTab('content');
+                        toast('Aba Conteudo - gere as legendas!', 'info');
+                    }, 1500);
                 }
             }
         } catch {}
@@ -532,6 +639,65 @@ function logLine(container, msg, type = '') {
     d.textContent = msg;
     container.appendChild(d);
     container.scrollTop = container.scrollHeight;
+}
+
+function logLineHtml(container, html, type = '') {
+    const d = document.createElement('div');
+    d.className = `log-entry ${type}`;
+    d.innerHTML = html;
+    container.appendChild(d);
+    container.scrollTop = container.scrollHeight;
+}
+
+// ─── AI Provider Toggle ─────────────────────────────────────────────────────
+function toggleAiProvider() {
+    const provider = g('aiProvider');
+    document.getElementById('groqConfig').style.display = provider === 'groq' ? 'block' : 'none';
+    document.getElementById('geminiConfig').style.display = provider === 'gemini' ? 'block' : 'none';
+}
+
+// ─── Groq Settings ──────────────────────────────────────────────────────────
+async function saveGroqSettings() {
+    const key = g('settingsGroqKey');
+    const model = g('settingsGroqModel') || 'llama-3.1-8b-instant';
+    if (!key) { toast('Informe a chave da API Groq.', 'warning'); return; }
+    try {
+        await api('/api/settings', {
+            method: 'PUT',
+            body: JSON.stringify({ groq_api_key: key, groq_model: model, ai_provider: 'groq' }),
+        });
+        document.getElementById('settingsGroqStatus').textContent = 'Salvo';
+        document.getElementById('settingsGroqStatus').style.color = 'var(--green)';
+        toast('Configuracao Groq salva!', 'success');
+    } catch { toast('Erro ao salvar.', 'error'); }
+}
+
+async function testGroqFromSettings() {
+    const key = g('settingsGroqKey');
+    if (!key) { toast('Informe a chave da API Groq primeiro.', 'warning'); return; }
+    const log = document.getElementById('contentLog'); log.innerHTML = '';
+    logLine(log, 'Testando conexao com Groq...', 'info');
+    try {
+        const d = await api('/api/content/test-groq', {
+            method: 'POST',
+            body: JSON.stringify({
+                groq_api_key: key,
+                groq_model: g('settingsGroqModel') || 'llama-3.1-8b-instant',
+            }),
+        });
+        if (d.logs) d.logs.forEach(m => logLine(log, m));
+        if (d.success) {
+            logLine(log, 'Groq API OK!', 'success');
+            document.getElementById('settingsGroqStatus').textContent = 'Conectado';
+            document.getElementById('settingsGroqStatus').style.color = 'var(--green)';
+            toast('Groq conectado!', 'success');
+        } else {
+            logLine(log, `Falha: ${d.error}`, 'error');
+            document.getElementById('settingsGroqStatus').textContent = 'Falha';
+            document.getElementById('settingsGroqStatus').style.color = 'var(--red)';
+            toast('Falha no Groq.', 'error');
+        }
+    } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); }
 }
 
 // ─── Gemini Settings ─────────────────────────────────────────────────────────
@@ -563,16 +729,19 @@ async function testGeminiFromSettings() {
                 gemini_model: g('settingsGeminiModel') || 'gemini-2.0-flash',
             }),
         });
+        // Show detailed logs
+        if (d.logs) d.logs.forEach(m => logLine(log, m));
+
         if (d.success) {
             logLine(log, 'Gemini API OK!', 'success');
             document.getElementById('settingsGeminiStatus').textContent = 'Conectado';
             document.getElementById('settingsGeminiStatus').style.color = 'var(--green)';
             toast('Gemini conectado!', 'success');
         } else {
-            logLine(log, `Erro: ${d.error}`, 'error');
+            logLine(log, `Falha: ${d.error}`, 'error');
             document.getElementById('settingsGeminiStatus').textContent = 'Falha';
             document.getElementById('settingsGeminiStatus').style.color = 'var(--red)';
-            toast('Falha no Gemini.', 'error');
+            toast('Falha no Gemini. Veja os logs.', 'error');
         }
     } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); }
 }
@@ -580,6 +749,8 @@ async function testGeminiFromSettings() {
 // ─── Content ─────────────────────────────────────────────────────────────────
 async function loadPostQueue() {
     try {
+        // Clean orphan posts first
+        await api('/api/posts/maintenance/cleanup-orphans', { method: 'POST' });
         STATE.postQueue = await api('/api/posts');
         renderContentQueue(STATE.postQueue);
         renderPostQueue(STATE.postQueue);
@@ -655,36 +826,80 @@ async function generateAIContent() {
     const item = STATE.postQueue[STATE.selectedContentIdx];
     if (!item?.video_path) { toast('Item invalido.', 'error'); return; }
     const log = document.getElementById('contentLog'); log.innerHTML = '';
-    logLine(log, 'Enviando video para Gemini... (pode levar alguns segundos)', 'info');
 
-    const geminiKey = g('settingsGeminiKey');
-    const geminiModel = g('settingsGeminiModel') || 'gemini-2.0-flash';
-    if (!geminiKey) {
-        logLine(log, 'Configure a chave da API Gemini na aba Configuracoes.', 'error');
-        toast('Configure o Gemini nas Configuracoes.', 'warning');
-        return;
+    const provider = g('aiProvider') || 'groq';
+
+    if (provider === 'groq') {
+        const groqKey = g('settingsGroqKey');
+        const groqModel = g('settingsGroqModel') || 'llama-3.1-8b-instant';
+        if (!groqKey) {
+            logLine(log, 'Configure a chave da API Groq na aba Configuracoes.', 'error');
+            toast('Configure o Groq nas Configuracoes.', 'warning');
+            return;
+        }
+        logLine(log, 'Extraindo audio e transcrevendo com Groq...', 'info');
+        try {
+            const d = await api('/api/content/generate-ai', {
+                method: 'POST',
+                body: JSON.stringify({
+                    video_path: item.video_path,
+                    keywords: g('contentKeywords'),
+                    base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
+                    ai_config: { provider: 'groq', groq_api_key: groqKey, groq_model: groqModel },
+                }),
+            });
+            if (d.logs) d.logs.forEach(m => logLine(log, m));
+            if (!d.success) { logLine(log, `Erro: ${d.error}`, 'error'); toast('Erro na IA.', 'error'); return; }
+            if (d.has_audio) {
+                logLine(log, 'Audio transcrito com sucesso!', 'success');
+            } else {
+                logLine(log, 'Sem audio. Revise a legenda manualmente.', 'warning');
+                toast('Sem audio no video. Revise a legenda!', 'warning');
+            }
+            document.getElementById('contentTitle').value = d.title || '';
+            document.getElementById('contentCta').value = d.cta || '';
+            document.getElementById('contentHashtags').value = d.hashtags || '';
+            document.getElementById('contentProductQuery').value = d.product_query || '';
+            document.getElementById('contentCaption').value = d.caption || '';
+            logLine(log, 'Conteudo gerado com Groq!', 'success');
+            toast('Conteudo gerado com Groq!', 'success');
+        } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); toast('Erro: ' + err.message, 'error'); }
+    } else {
+        // Gemini
+        const geminiKey = g('settingsGeminiKey');
+        const geminiModel = g('settingsGeminiModel') || 'gemini-2.0-flash';
+        if (!geminiKey) {
+            logLine(log, 'Configure a chave da API Gemini na aba Configuracoes.', 'error');
+            toast('Configure o Gemini nas Configuracoes.', 'warning');
+            return;
+        }
+        logLine(log, 'Enviando frame para Gemini...', 'info');
+        try {
+            const d = await api('/api/content/generate-ai', {
+                method: 'POST',
+                body: JSON.stringify({
+                    video_path: item.video_path,
+                    keywords: g('contentKeywords'),
+                    base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
+                    ai_config: { provider: 'gemini', gemini_api_key: geminiKey, gemini_model: geminiModel },
+                }),
+            });
+            if (d.logs) d.logs.forEach(m => logLine(log, m));
+            if (!d.success) { logLine(log, `Erro: ${d.error}`, 'error'); toast('Erro na IA.', 'error'); return; }
+            if (d.has_audio) {
+                logLine(log, 'Audio detectado!', 'success');
+            } else {
+                logLine(log, 'Sem audio. Revise manualmente.', 'warning');
+            }
+            document.getElementById('contentTitle').value = d.title || '';
+            document.getElementById('contentCta').value = d.cta || '';
+            document.getElementById('contentHashtags').value = d.hashtags || '';
+            document.getElementById('contentProductQuery').value = d.product_query || '';
+            document.getElementById('contentCaption').value = d.caption || '';
+            logLine(log, 'Conteudo gerado com Gemini!', 'success');
+            toast('Conteudo gerado com Gemini!', 'success');
+        } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); toast('Erro: ' + err.message, 'error'); }
     }
-
-    try {
-        const d = await api('/api/content/generate-ai', {
-            method: 'POST',
-            body: JSON.stringify({
-                video_path: item.video_path,
-                keywords: g('contentKeywords'),
-                base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
-                ai_config: { gemini_api_key: geminiKey, gemini_model: geminiModel },
-            }),
-        });
-        if (d.logs) d.logs.forEach(m => logLine(log, m));
-        if (!d.success) { logLine(log, `Erro: ${d.error}`, 'error'); toast('Erro na IA.', 'error'); return; }
-        document.getElementById('contentTitle').value = d.title || '';
-        document.getElementById('contentCta').value = d.cta || '';
-        document.getElementById('contentHashtags').value = d.hashtags || '';
-        document.getElementById('contentProductQuery').value = d.product_query || '';
-        document.getElementById('contentCaption').value = d.caption || '';
-        logLine(log, 'Conteudo gerado com Gemini!', 'success');
-        toast('Conteudo gerado com Gemini!', 'success');
-    } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); toast('Erro: ' + err.message, 'error'); }
 }
 
 async function saveContent() {
@@ -899,6 +1114,20 @@ async function loadSettings() {
         const d = await api('/api/settings');
         const s = d.settings || {};
 
+        // AI provider
+        if (s.ai_provider) {
+            document.getElementById('aiProvider').value = s.ai_provider;
+            toggleAiProvider();
+        }
+
+        // Groq settings
+        if (s.groq_api_key) {
+            document.getElementById('settingsGroqKey').value = s.groq_api_key;
+            document.getElementById('settingsGroqStatus').textContent = 'Configurado';
+            document.getElementById('settingsGroqStatus').style.color = 'var(--green)';
+        }
+        if (s.groq_model) document.getElementById('settingsGroqModel').value = s.groq_model;
+
         // Gemini settings
         if (s.ai_gemini_key) {
             document.getElementById('settingsGeminiKey').value = s.ai_gemini_key;
@@ -952,6 +1181,80 @@ async function loadQueueStats() {
         document.getElementById('queuePublicado').textContent = bs['PUBLICADO'] || '0';
         document.getElementById('queueErro').textContent = bs['ERRO'] || '0';
     } catch {}
+}
+
+// ─── Scheduler ───────────────────────────────────────────────────────────────
+async function loadSchedulerStatus() {
+    try {
+        const d = await api('/api/posts/scheduler/status');
+        const el = document.getElementById('schedulerStatus');
+        if (el) {
+            el.textContent = d.running ? 'Rodando' : 'Parado';
+            el.style.color = d.running ? 'var(--green)' : 'var(--text-dim)';
+        }
+    } catch {}
+}
+
+async function schedulerStart() {
+    try {
+        await api('/api/posts/scheduler/start', { method: 'POST' });
+        toast('Scheduler iniciado!', 'success');
+        loadSchedulerStatus();
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
+}
+
+async function schedulerStop() {
+    try {
+        await api('/api/posts/scheduler/stop', { method: 'POST' });
+        toast('Scheduler parado.', 'info');
+        loadSchedulerStatus();
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
+}
+
+// ─── Worker Logs ─────────────────────────────────────────────────────────────
+async function loadWorkerLogs() {
+    const section = document.getElementById('workerLogsSection');
+    const box = document.getElementById('workerLogsBox');
+    section.style.display = 'block';
+    box.innerHTML = '<span class="log-placeholder">Carregando...</span>';
+    try {
+        const logs = await api('/api/posts/logs?limit=100');
+        if (!logs.length) { box.innerHTML = '<span class="log-placeholder">Nenhum log encontrado.</span>'; return; }
+        box.innerHTML = logs.map(l => {
+            const time = l.created_at || '';
+            const msg = l.message || l.level || JSON.stringify(l);
+            const cls = (l.level || '').toLowerCase();
+            return `<div class="log-entry ${cls}">[${time}] ${msg}</div>`;
+        }).join('');
+    } catch { box.innerHTML = '<span class="log-placeholder">Erro ao carregar logs.</span>'; }
+}
+
+// ─── Batch History ───────────────────────────────────────────────────────────
+async function loadBatchHistory() {
+    const section = document.getElementById('batchHistorySection');
+    const list = document.getElementById('batchHistoryList');
+    section.style.display = 'block';
+    list.innerHTML = '<span class="log-placeholder">Carregando...</span>';
+    try {
+        const batches = await api('/api/posts/batch-history?limit=20');
+        if (!batches.length) { list.innerHTML = '<span class="log-placeholder">Nenhum histórico.</span>'; return; }
+        list.innerHTML = batches.map(b => {
+            const time = b.created_at || '';
+            return `<div class="queue-item">
+                <span class="queue-item-name">[${time}] Upload: ${b.upload_count || 0} | Processado: ${b.process_count || 0} | Sucesso: ${b.success_count || 0} | Erro: ${b.fail_count || 0}</span>
+            </div>`;
+        }).join('');
+    } catch { list.innerHTML = '<span class="log-placeholder">Erro ao carregar histórico.</span>'; }
+}
+
+// ─── Duplicate Caption ──────────────────────────────────────────────────────
+function duplicateCaption() {
+    const src = document.getElementById('postCaption');
+    const dst = document.getElementById('contentCaption');
+    if (src && dst) {
+        dst.value = src.value;
+        toast('Legenda duplicada para aba Conteúdo!', 'success');
+    }
 }
 
 function refreshAll() {

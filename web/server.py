@@ -63,6 +63,11 @@ app = FastAPI(
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# Mount assets directory for preview background/logo images
+ASSETS_DIR = PROJECT_ROOT / "assets"
+if ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
 # Configure templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -176,8 +181,8 @@ async def config_paths() -> dict[str, str]:
     return {
         "writable_root": str(writable_root()),
         "resource_root": str(resource_root()),
-        "input_dir": str(writable_root() / "entrada"),
-        "output_dir": str(writable_root() / "saida"),
+        "input_dir": "entrada (pasta interna do servidor)",
+        "output_dir": "saida (pasta interna do servidor)",
     }
 
 
@@ -189,7 +194,7 @@ def run_server() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
 
     print("  ========================================")
-    print(f"  VideoEditorLote v2.0.0")
+    print(f"  VideoEditorLote v2.9.0")
     print(f"  http://{host}:{port}")
     print(f"  Swagger: http://{host}:{port}/docs")
     print(f"  Pressione Ctrl+C para parar")
