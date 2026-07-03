@@ -66,13 +66,19 @@ def generate_content_from_video(
         return None, False, ""
 
     # 1. Extract audio
-    _log(log_callback, "Extraindo audio do video...")
+    _log(log_callback, f"Extraindo audio do video: {video_path.name}")
     audio_path = _extract_audio(video_path, ffmpeg_executable)
     has_audio = False
     transcript = ""
 
     if audio_path:
+        _log(log_callback, f"Audio extraido com sucesso: {audio_path}")
         duration = _get_audio_duration(audio_path, ffmpeg_executable)
+        if duration:
+            _log(log_callback, f"Duracao do audio: {duration:.1f}s (minimo: {MIN_AUDIO_DURATION}s)")
+        else:
+            _log(log_callback, "Nao foi possivel obter duracao do audio.")
+        
         if duration and duration >= MIN_AUDIO_DURATION:
             has_audio = True
             _log(log_callback, f"Audio encontrado ({duration:.1f}s). Transcrevendo com Groq Whisper...")
@@ -84,7 +90,7 @@ def generate_content_from_video(
         except Exception:
             pass
     else:
-        _log(log_callback, "Nenhum audio encontrado no video.")
+        _log(log_callback, "Nenhum audio encontrado no video. Verifique se o video possui trilha de audio.")
 
     # 2. Generate caption
     if has_audio and transcript:
@@ -111,16 +117,28 @@ def _extract_audio(video_path: Path, ffmpeg: str) -> str | None:
     try:
         tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
         tmp.close()
+        _log(None, f"Extraindo audio de: {video_path}")
         result = subprocess.run(
             [ffmpeg, "-y", "-hide_banner", "-i", str(video_path),
              "-vn", "-acodec", "libmp3lame", "-q:a", "4", tmp.name],
             capture_output=True, text=True, timeout=60,
         )
-        if result.returncode == 0 and Path(tmp.name).stat().st_size > 1000:
-            return tmp.name
-        Path(tmp.name).unlink(missing_ok=True)
-        return None
-    except Exception:
+        if result.returncode != 0:
+            _log(None, f"FFmpeg falhou (code {result.returncode}): {result.stderr[:200] if result.stderr else 'sem stderr'}")
+            Path(tmp.name).unlink(missing_ok=True)
+            return None
+        
+        file_size = Path(tmp.name).stat().st_size
+        _log(None, f"Audio extraido: {tmp.name} ({file_size} bytes)")
+        
+        if file_size < 1000:
+            _log(None, f"Audio muito pequeno ({file_size} bytes), ignorando.")
+            Path(tmp.name).unlink(missing_ok=True)
+            return None
+        
+        return tmp.name
+    except Exception as e:
+        _log(None, f"Erro ao extrair audio: {e}")
         return None
 
 
@@ -128,13 +146,26 @@ def _get_audio_duration(audio_path: str, ffmpeg: str) -> float | None:
     try:
         import shutil
         ffprobe = shutil.which("ffprobe") or ffmpeg.replace("ffmpeg", "ffprobe")
+        _log(None, f"Verificando duracao com ffprobe: {ffprobe}")
         result = subprocess.run(
             [ffprobe, "-v", "error", "-show_entries", "format=duration",
              "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
             capture_output=True, text=True, timeout=10,
         )
-        return float(result.stdout.strip()) if result.stdout.strip() else None
-    except Exception:
+        if result.returncode != 0:
+            _log(None, f"ffprobe falhou: {result.stderr[:100] if result.stderr else ''}")
+            return None
+        
+        duration_str = result.stdout.strip()
+        if not duration_str:
+            _log(None, "ffprobe retornou duracao vazia.")
+            return None
+        
+        duration = float(duration_str)
+        _log(None, f"Duracao obtida: {duration:.2f}s")
+        return duration
+    except Exception as e:
+        _log(None, f"Erro ao obter duracao: {e}")
         return None
 
 
