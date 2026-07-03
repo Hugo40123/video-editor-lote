@@ -115,6 +115,13 @@ A fila limpa posts orfaos (arquivos deletados) ao carregar.
 | WorkerLog | Log de atividade dos workers |
 | BatchHistory | Historico de processamentos |
 
+## Regras de Trabalho
+
+- **Toda atualização** deve seguir este fluxo ao finalizar:
+  1. Commitar as mudanças no git com mensagem descritiva em inglês
+  2. Atualizar os arquivos da pasta `context/` se houver mudanças na arquitetura, convenções ou decisões
+  3. Executar `iniciar.bat` automaticamente ao finalizar para validar
+
 ## Cuidados ao Modificar
 
 - **Repository layer** e a unica forma de acessar o banco
