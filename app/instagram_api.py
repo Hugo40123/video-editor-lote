@@ -49,7 +49,7 @@ class InstagramClient:
             "GET",
             f"{self.config.base_url}/{self.config.ig_user_id}",
             params={
-                "fields": "id",
+                "fields": "id,username",
                 "access_token": self.config.access_token,
             },
         )
