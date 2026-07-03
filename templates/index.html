@@ -229,8 +229,11 @@
                         <div class="btn-row" style="margin-top:10px;">
                             <button class="btn btn-sm btn-ghost" onclick="importOutputVideos()">📥 Importar saída</button>
                             <button class="btn btn-sm btn-ghost" onclick="loadPostQueue()">↻ Atualizar</button>
+                            <button class="btn btn-sm btn-ghost" onclick="toggleSelectAll()">☑️ Selecionar todos</button>
                             <button class="btn btn-sm" onclick="generateLocalContent()">📝 Rascunho rápido</button>
                             <button class="btn btn-sm btn-primary" onclick="generateAIContent()">🤖 Gerar com Gemini</button>
+                            <button class="btn btn-sm btn-accent" onclick="generateBatchContent()">📋 Gerar em lote</button>
+                            <button class="btn btn-sm btn-danger" onclick="cancelBatch()" style="display:none;" id="cancelBatchBtn">⏹ Cancelar</button>
                         </div>
                     </div>
 
@@ -252,23 +255,30 @@
                                 <input type="url" id="contentAffiliateLink" class="form-input" placeholder="https://...">
                             </div>
                         </div>
-                        <div class="form-row three-col">
+                        <div class="form-row">
                             <div class="form-group">
-                                <label>Título</label>
-                                <input type="text" id="contentTitle" class="form-input">
-                            </div>
-                            <div class="form-group">
-                                <label>CTA</label>
-                                <input type="text" id="contentCta" class="form-input">
-                            </div>
-                            <div class="form-group">
-                                <label>Hashtags</label>
-                                <input type="text" id="contentHashtags" class="form-input">
+                                <label>Nicho</label>
+                                <select id="contentNiche" class="form-input">
+                                    <option value="">Selecione o nicho...</option>
+                                    <option value="casa">Casa & Decoracao</option>
+                                    <option value="tecnologia">Tecnologia</option>
+                                    <option value="beleza">Beleza & Cuidados</option>
+                                    <option value="moda">Moda & Acessorios</option>
+                                    <option value="pets">Pets</option>
+                                    <option value="infantil">Infantil & Kids</option>
+                                    <option value="fitness">Fitness & Saude</option>
+                                    <option value="cozinha">Cozinha & Alimentacao</option>
+                                    <option value="geral">Geral / Achadinhos</option>
+                                </select>
                             </div>
                         </div>
+                        <!-- Campos internos (usados pela IA, ocultos do usuario) -->
+                        <input type="hidden" id="contentTitle">
+                        <input type="hidden" id="contentCta">
+                        <input type="hidden" id="contentHashtags">
                         <div class="form-group">
                             <label>Legenda final</label>
-                            <textarea id="contentCaption" class="form-textarea" rows="5"></textarea>
+                            <textarea id="contentCaption" class="form-textarea" rows="10" placeholder="Título + texto persuasivo + CTA + hashtags. A IA gera tudo automaticamente."></textarea>
                         </div>
                         <div class="btn-row">
                             <button class="btn btn-sm btn-ghost" onclick="copyCaption('contentCaption')">📋 Copiar</button>

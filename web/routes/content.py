@@ -34,6 +34,7 @@ class GenerateRequest(BaseModel):
     video_path: str
     keywords: str = ""
     base_hashtags: str = "#achadinhos #shopee #mercadolivre"
+    niche: str = ""
     ai_config: AiConfigData | None = None
 
 
@@ -250,6 +251,7 @@ async def generate_ai(req: GenerateRequest) -> dict[str, Any]:
             ffmpeg_executable=executable,
             keywords=req.keywords,
             base_hashtags=req.base_hashtags,
+            niche=req.niche,
             log_callback=log_cb,
         )
 

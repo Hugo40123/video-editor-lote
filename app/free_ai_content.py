@@ -41,6 +41,7 @@ def generate_ai_content_from_video(
     ffmpeg_executable: str,
     keywords: str,
     base_hashtags: str,
+    niche: str = "",
     log_callback: LogCallback | None = None,
 ) -> FreeAiResult:
     """Generate Instagram caption using the configured AI provider."""
@@ -57,13 +58,13 @@ def generate_ai_content_from_video(
     if config.provider == "groq":
         return _generate_with_groq(
             video_path, api_key=api_key, model=config.model,
-            keywords=keywords, base_hashtags=base_hashtags,
+            keywords=keywords, base_hashtags=base_hashtags, niche=niche,
             ffmpeg_executable=ffmpeg_executable, log_callback=log_callback,
         )
     elif config.provider == "gemini":
         return _generate_with_gemini(
             video_path, api_key=api_key, model=config.model,
-            keywords=keywords, base_hashtags=base_hashtags,
+            keywords=keywords, base_hashtags=base_hashtags, niche=niche,
             ffmpeg_executable=ffmpeg_executable, log_callback=log_callback,
         )
     else:
@@ -73,7 +74,7 @@ def generate_ai_content_from_video(
 
 
 def _generate_with_groq(
-    video_path, *, api_key, model, keywords, base_hashtags, ffmpeg_executable, log_callback,
+    video_path, *, api_key, model, keywords, base_hashtags, niche, ffmpeg_executable, log_callback,
 ) -> FreeAiResult:
     from .groq_content import generate_content_from_video as groq_generate
 
@@ -83,6 +84,7 @@ def _generate_with_groq(
         api_key=api_key,
         keywords=keywords,
         base_hashtags=base_hashtags,
+        niche=niche,
         llm_model=model or "llama-3.1-8b-instant",
         log_callback=log_callback,
         ffmpeg_executable=ffmpeg_executable,
@@ -98,7 +100,7 @@ def _generate_with_groq(
 
 
 def _generate_with_gemini(
-    video_path, *, api_key, model, keywords, base_hashtags, ffmpeg_executable, log_callback,
+    video_path, *, api_key, model, keywords, base_hashtags, niche, ffmpeg_executable, log_callback,
 ) -> FreeAiResult:
     from .gemini_content import generate_content_from_video as gemini_generate
 
@@ -108,6 +110,7 @@ def _generate_with_gemini(
         api_key=api_key,
         keywords=keywords,
         base_hashtags=base_hashtags,
+        niche=niche,
         model=model or "gemini-2.0-flash",
         log_callback=log_callback,
         ffmpeg_executable=ffmpeg_executable,

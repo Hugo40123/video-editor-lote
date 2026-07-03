@@ -32,6 +32,7 @@ def generate_content_from_video(
     api_key: str,
     keywords: str = "",
     base_hashtags: str = "#achadinhos #shopee #mercadolivre",
+    niche: str = "",
     whisper_model: str = DEFAULT_WHISPER_MODEL,
     llm_model: str = DEFAULT_LLM_MODEL,
     log_callback: LogCallback | None = None,
@@ -97,7 +98,7 @@ def generate_content_from_video(
         _log(log_callback, "Gerando legenda com Llama...")
         draft = _generate_from_transcript(
             client, transcript, video_path.name,
-            keywords=keywords, base_hashtags=base_hashtags,
+            keywords=keywords, base_hashtags=base_hashtags, niche=niche,
             llm_model=llm_model, log_callback=log_callback,
         )
         if draft:
@@ -205,9 +206,22 @@ def _transcribe_audio(client, audio_path: str, model: str, log_callback) -> str:
 
 def _generate_from_transcript(
     client, transcript: str, video_name: str, *,
-    keywords: str, base_hashtags: str, llm_model: str,
+    keywords: str, base_hashtags: str, niche: str, llm_model: str,
     log_callback,
 ) -> ContentDraft | None:
+    niche_map = {
+        "casa": "casa, decoracao, organizacao, lar, utilidades domesticas",
+        "tecnologia": "tecnologia, gadgets, eletronicos, smart, inovacao",
+        "beleza": "beleza, maquiagem, skincare, cuidados pessoais, cosméticos",
+        "moda": "moda, roupas, acessorios, estilo, fashion",
+        "pets": "pets, animais, cachorros, gatos, petiscos, brinquedos pet",
+        "infantil": "infantil, kids, bebes, brinquedos, educacao, escola",
+        "fitness": "fitness, saude, exercicios, bem-estar, suplementos",
+        "cozinha": "cozinha, culinaria, receitas, utensilios, alimentos",
+        "geral": "achadinhos, ofertas, compras, dicas, promoções",
+    }
+    niche_desc = niche_map.get(niche, niche_map["geral"])
+
     system_instruction = (
         "Voce e um copywriter brasileiro especializado em posts de afiliados para Instagram. "
         "Voce recebeu a transcricao de um video de Reels/achadinhos.\n\n"
@@ -219,7 +233,9 @@ def _generate_from_transcript(
         "- NAO copie trechos literais da transcricao\n"
         "- NAO invente precos, descontos, garantias ou lojas\n"
         "- Termine com 'Publi' em linha separada e hashtags\n"
-        "- A legenda deve ter entre 800 e 1500 caracteres\n\n"
+        "- A legenda deve ter entre 800 e 1500 caracteres\n"
+        f"- As hashtags devem ser relevantes para o nicho: {niche_desc}\n"
+        "- Gere entre 10 e 15 hashtags mixadas (populares + nichadas)\n\n"
         "Responda SOMENTE com JSON valido, sem marcacao ```."
     )
 
@@ -231,6 +247,7 @@ def _generate_from_transcript(
 Nome do arquivo: {video_name}
 Palavras-chave: {keywords or "nenhuma"}
 Hashtags base: {base_hashtags or "nenhuma"}
+Nicho: {niche_desc}
 
 Crie a legenda de Instagram.
 
@@ -239,7 +256,7 @@ Responda EXATAMENTE este JSON:
   "title": "titulo chamativo com emojis",
   "caption": "legenda completa para Instagram com Publi e hashtags",
   "cta": "chamada para acao curta",
-  "hashtags": "#tag1 #tag2 #tag3",
+  "hashtags": "#tag1 #tag2 #tag3 ... (10 a 15 hashtags relevantes para o nicho)",
   "product_query": "produto1, produto2",
   "product_keywords": "palavras-chave separadas por espaco"
 }}"""

@@ -1383,6 +1383,13 @@ select.form-input {
 #dashErro .dashboard-number { color: var(--red); }
 #dashTotal .dashboard-number { color: var(--accent); }
 
+/* Batch selection */
+.batch-checkbox {
+    margin-right: 8px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
 @media (max-width: 1100px) {
     .editor-grid { grid-template-columns: 1fr; }
     .content-grid-main { grid-template-columns: 1fr; }

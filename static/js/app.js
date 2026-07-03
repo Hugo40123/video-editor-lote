@@ -18,6 +18,9 @@ const STATE = {
     uploadedBgImage: null,       // { server_path, original_name }
     uploadedLogoImage: null,     // { server_path, original_name }
     sessionDir: null,            // server-side session directory
+    // Batch generation
+    batchSelected: new Set(),
+    batchGenerating: false,
 };
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -766,11 +769,113 @@ function renderContentQueue(items) {
     list.innerHTML = items.map((item, idx) => {
         const name = item.video_path?.split(/[/\\\\]/).pop() || 'video';
         const st = item.content_status || 'Pendente';
+        const checked = STATE.batchSelected?.has(idx) ? 'checked' : '';
         return `<div class="queue-item ${STATE.selectedContentIdx === idx ? 'selected' : ''}" onclick="selectContentItem(${idx})">
+            <input type="checkbox" class="batch-checkbox" ${checked} onclick="event.stopPropagation(); toggleBatchSelect(${idx})">
             <span class="queue-item-name">${name}</span>
             <span class="queue-item-status ${st.toLowerCase().replace(/\\s+/g,'')}">${st}</span>
         </div>`;
     }).join('');
+}
+
+function toggleBatchSelect(idx) {
+    if (STATE.batchSelected.has(idx)) {
+        STATE.batchSelected.delete(idx);
+    } else {
+        STATE.batchSelected.add(idx);
+    }
+    renderContentQueue(STATE.postQueue);
+}
+
+function toggleSelectAll() {
+    if (STATE.batchSelected.size === STATE.postQueue.length) {
+        STATE.batchSelected.clear();
+    } else {
+        STATE.postQueue.forEach((_, idx) => STATE.batchSelected.add(idx));
+    }
+    renderContentQueue(STATE.postQueue);
+}
+
+async function generateBatchContent() {
+    if (STATE.batchGenerating) { toast('Geracao em andamento...', 'warning'); return; }
+    if (STATE.batchSelected.size === 0) { toast('Selecione ao menos um video.', 'warning'); return; }
+
+    const provider = g('aiProvider') || 'groq';
+    const groqKey = g('settingsGroqKey');
+    const geminiKey = g('settingsGeminiKey');
+
+    if (provider === 'groq' && !groqKey) { toast('Configure o Groq nas Configuracoes.', 'warning'); return; }
+    if (provider === 'gemini' && !geminiKey) { toast('Configure o Gemini nas Configuracoes.', 'warning'); return; }
+
+    STATE.batchGenerating = true;
+    const log = document.getElementById('contentLog');
+    log.innerHTML = '';
+    const total = STATE.batchSelected.size;
+    let success = 0;
+    let failed = 0;
+
+    logLine(log, `Iniciando geracao em lote: ${total} video(s)...`, 'info');
+
+    const indices = Array.from(STATE.batchSelected).sort((a, b) => a - b);
+
+    for (let i = 0; i < indices.length; i++) {
+        if (!STATE.batchGenerating) { logLine(log, 'Cancelado pelo usuario.', 'warning'); break; }
+        const idx = indices[i];
+        const item = STATE.postQueue[idx];
+        if (!item?.video_path) { failed++; continue; }
+
+        const name = item.video_path.split(/[/\\\\]/).pop();
+        logLine(log, `[${i + 1}/${total}] Processando: ${name}`, 'info');
+
+        try {
+            const aiConfig = provider === 'groq'
+                ? { provider: 'groq', groq_api_key: groqKey, groq_model: g('settingsGroqModel') || 'llama-3.1-8b-instant' }
+                : { provider: 'gemini', gemini_api_key: geminiKey, gemini_model: g('settingsGeminiModel') || 'gemini-2.0-flash' };
+
+            const d = await api('/api/content/generate-ai', {
+                method: 'POST',
+                body: JSON.stringify({
+                    video_path: item.video_path,
+                    keywords: item.product_keywords || '',
+                    base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
+                    niche: g('contentNiche'),
+                    ai_config: aiConfig,
+                }),
+            });
+
+            if (d.success) {
+                await api(`/api/posts/${item.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        content_title: d.title || '',
+                        content_cta: d.cta || '',
+                        content_hashtags: d.hashtags || '',
+                        product_query: d.product_query || '',
+                        caption: d.caption || '',
+                        content_status: 'Gerado',
+                    }),
+                });
+                success++;
+                logLine(log, `  OK: ${name}`, 'success');
+            } else {
+                failed++;
+                logLine(log, `  ERRO: ${name} - ${d.error || 'desconhecido'}`, 'error');
+            }
+        } catch (err) {
+            failed++;
+            logLine(log, `  ERRO: ${name} - ${err.message}`, 'error');
+        }
+    }
+
+    STATE.batchGenerating = false;
+    logLine(log, `Lote concluido: ${success} sucesso, ${failed} erros.`, success > 0 ? 'success' : 'warning');
+    toast(`Lote: ${success} sucesso, ${failed} erros.`, success > 0 ? 'success' : 'warning');
+    STATE.batchSelected.clear();
+    loadPostQueue();
+}
+
+function cancelBatch() {
+    STATE.batchGenerating = false;
 }
 
 function selectContentItem(idx) {
@@ -845,6 +950,7 @@ async function generateAIContent() {
                     video_path: item.video_path,
                     keywords: g('contentKeywords'),
                     base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
+                    niche: g('contentNiche'),
                     ai_config: { provider: 'groq', groq_api_key: groqKey, groq_model: groqModel },
                 }),
             });
@@ -881,6 +987,7 @@ async function generateAIContent() {
                     video_path: item.video_path,
                     keywords: g('contentKeywords'),
                     base_hashtags: g('postDefaultHashtags') || '#achadinhos #shopee #mercadolivre',
+                    niche: g('contentNiche'),
                     ai_config: { provider: 'gemini', gemini_api_key: geminiKey, gemini_model: geminiModel },
                 }),
             });
@@ -1180,6 +1287,9 @@ async function loadSettings() {
         if (s.logo_image) {
             STATE.uploadedLogoImage = { server_path: s.logo_image };
         }
+
+        // Content niche
+        if (s.content_niche) document.getElementById('contentNiche').value = s.content_niche;
     } catch {}
 }
 
@@ -1223,6 +1333,8 @@ async function saveSettingsToServer() {
                 // Image paths
                 background_image: STATE.uploadedBgImage ? STATE.uploadedBgImage.server_path : '',
                 logo_image: STATE.uploadedLogoImage ? STATE.uploadedLogoImage.server_path : '',
+                // Content niche
+                content_niche: g('contentNiche'),
             }),
         });
     } catch {}
