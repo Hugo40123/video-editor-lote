@@ -1150,6 +1150,36 @@ async function loadSettings() {
         // Default captions
         if (s.post_default_caption) document.getElementById('postDefaultCaption').value = s.post_default_caption;
         if (s.post_default_hashtags) document.getElementById('postDefaultHashtags').value = s.post_default_hashtags;
+
+        // Video editing settings
+        if (s.video_template) document.getElementById('templateSelect').value = s.video_template;
+        if (s.video_size) document.getElementById('videoSize').value = s.video_size;
+        if (s.video_width) document.getElementById('videoWidth').value = s.video_width;
+        if (s.video_offset_x !== undefined) document.getElementById('videoOffsetX').value = s.video_offset_x;
+        if (s.video_offset_y !== undefined) document.getElementById('videoOffsetY').value = s.video_offset_y;
+        if (s.text_watermark) document.getElementById('textMark').value = s.text_watermark;
+        if (s.text_watermark_size) document.getElementById('textMarkSize').value = s.text_watermark_size;
+        if (s.text_watermark_offset_x !== undefined) document.getElementById('textMarkOffsetX').value = s.text_watermark_offset_x;
+        if (s.text_watermark_offset_y !== undefined) document.getElementById('textMarkOffsetY').value = s.text_watermark_offset_y;
+        if (s.delogo_x !== undefined) document.getElementById('delogoX').value = s.delogo_x;
+        if (s.delogo_y !== undefined) document.getElementById('delogoY').value = s.delogo_y;
+        if (s.delogo_width !== undefined) document.getElementById('delogoWidth').value = s.delogo_width;
+        if (s.delogo_height !== undefined) document.getElementById('delogoHeight').value = s.delogo_height;
+        if (s.max_duration) document.getElementById('maxDuration').value = s.max_duration;
+
+        // Checkboxes
+        if (s.apply_watermark !== undefined) document.getElementById('applyLogo').checked = s.apply_watermark === true || s.apply_watermark === 'true';
+        if (s.apply_text_watermark !== undefined) document.getElementById('applyTextMark').checked = s.apply_text_watermark === true || s.apply_text_watermark === 'true';
+        if (s.remove_center_watermark !== undefined) document.getElementById('removeWatermark').checked = s.remove_center_watermark === true || s.remove_center_watermark === 'true';
+
+        // Background and logo images
+        if (s.background_image) {
+            STATE.uploadedBgImage = { server_path: s.background_image };
+            loadBgImage(s.background_image);
+        }
+        if (s.logo_image) {
+            STATE.uploadedLogoImage = { server_path: s.logo_image };
+        }
     } catch {}
 }
 
@@ -1158,12 +1188,41 @@ async function saveSettingsToServer() {
         await api('/api/settings', {
             method: 'PUT',
             body: JSON.stringify({
+                // AI provider
+                ai_provider: g('aiProvider'),
+                // Groq settings
+                groq_api_key: g('settingsGroqKey'),
+                groq_model: g('settingsGroqModel'),
+                // Gemini settings
                 ai_gemini_key: g('settingsGeminiKey'),
                 ai_gemini_model: g('settingsGeminiModel') || 'gemini-2.0-flash',
+                // Instagram settings
                 instagram_user_id: g('settingsIgUserId'),
                 instagram_access_token: g('settingsIgAccessToken'),
+                // Default captions
                 post_default_caption: g('postDefaultCaption'),
                 post_default_hashtags: g('postDefaultHashtags'),
+                // Video editing settings
+                video_template: g('templateSelect'),
+                video_size: +g('videoSize') || 100,
+                video_width: +g('videoWidth') || 100,
+                video_offset_x: +g('videoOffsetX') || 0,
+                video_offset_y: +g('videoOffsetY') || 0,
+                apply_watermark: cb('applyLogo'),
+                apply_text_watermark: cb('applyTextMark'),
+                text_watermark: g('textMark'),
+                text_watermark_size: +g('textMarkSize') || 76,
+                text_watermark_offset_x: +g('textMarkOffsetX') || 0,
+                text_watermark_offset_y: +g('textMarkOffsetY') || 0,
+                remove_center_watermark: cb('removeWatermark'),
+                delogo_x: +g('delogoX') || 190,
+                delogo_y: +g('delogoY') || 860,
+                delogo_width: +g('delogoWidth') || 700,
+                delogo_height: +g('delogoHeight') || 160,
+                max_duration: g('maxDuration'),
+                // Image paths
+                background_image: STATE.uploadedBgImage ? STATE.uploadedBgImage.server_path : '',
+                logo_image: STATE.uploadedLogoImage ? STATE.uploadedLogoImage.server_path : '',
             }),
         });
     } catch {}
