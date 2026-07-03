@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
 
-from .utils import default_font_path, ensure_directory, make_batch_output_path, make_unique_batch_output_path
+from .utils import default_font_path, ensure_directory, make_batch_output_path, make_unique_batch_output_path, get_next_sequential_number
 
 
 CANVAS_WIDTH = 1080
@@ -108,7 +108,10 @@ def process_videos(
     output_dir = ensure_directory(options.output_dir)
     used_output_files: set[str] = set()
 
-    for index, input_video in enumerate(files, start=1):
+    # Get the next sequential number from existing files in the output folder
+    start_index = get_next_sequential_number(output_dir)
+
+    for index, input_video in enumerate(files, start=start_index):
         output_file = make_unique_batch_output_path(
             make_batch_output_path(output_dir, index),
             used_output_files,

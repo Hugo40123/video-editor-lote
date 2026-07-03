@@ -219,6 +219,25 @@ def make_batch_output_path(output_dir: str | Path, index: int) -> Path:
     return Path(output_dir) / f"video_{index:02d}.mp4"
 
 
+def get_next_sequential_number(output_dir: str | Path) -> int:
+    """Scan output folder and return the next sequential number for video_XX.mp4 files."""
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        return 1
+
+    max_num = 0
+    for file in output_path.iterdir():
+        if file.is_file() and file.suffix.lower() == ".mp4":
+            name = file.stem
+            if name.startswith("video_"):
+                try:
+                    num = int(name.split("_")[1])
+                    max_num = max(max_num, num)
+                except (IndexError, ValueError):
+                    pass
+    return max_num + 1
+
+
 def sanitize_filename(name: str) -> str:
     cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip()
     return cleaned or "video"
