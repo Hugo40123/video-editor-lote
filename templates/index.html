@@ -34,6 +34,10 @@
             ⚙️
             <span class="tooltip">Configurações</span>
         </button>
+        <button class="nav-item" data-tab="history">
+            📊
+            <span class="tooltip">Histórico</span>
+        </button>
 
         <div class="sidebar-spacer"></div>
         <span class="nav-status" id="statusIndicator" title="Servidor online"></span>
@@ -108,6 +112,9 @@
                             <div class="form-group" style="display:flex; align-items:flex-end; gap:12px;">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="applyLogo" checked> Aplicar logo
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="generateCoverFrame"> Gerar capa
                                 </label>
                             </div>
                         </div>
@@ -240,6 +247,9 @@
                     <div class="card">
                         <div class="card-title">✍️ Editor de legenda</div>
                         <div class="item-meta" id="contentMeta">Nenhum item selecionado</div>
+                        <div id="contentThumbnail" style="display:none;margin-bottom:12px;text-align:center;">
+                            <img id="contentThumbImg" src="" alt="Thumbnail" style="max-width:180px;border-radius:8px;border:1px solid var(--border);">
+                        </div>
 
                         <div class="form-row three-col">
                             <div class="form-group">
@@ -366,6 +376,33 @@
                     </div>
                     <div class="setting-row" style="padding:6px 0;font-size:11px;color:var(--text-dim);">
                         Verifica a cada 30s por posts agendados. Retry automático com backoff exponencial (máx 3 tentativas).
+                    </div>
+                </div>
+
+                <!-- ═══ Smart Scheduler ═══ -->
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-title">🧠 Agendamento Inteligente</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Posts por dia</label>
+                            <select id="smartPostsPerDay" class="form-input">
+                                <option value="1">1 post por dia</option>
+                                <option value="2">2 posts por dia</option>
+                                <option value="3" selected>3 posts por dia</option>
+                                <option value="4">4 posts por dia</option>
+                                <option value="5">5 posts por dia</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Data início</label>
+                            <input type="date" id="smartStartDate" class="form-input">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <button class="btn btn-sm btn-accent" onclick="smartSchedule()">🧠 Agendar automaticamente</button>
+                        </div>
+                    </div>
+                    <div class="setting-row" style="padding:6px 0;font-size:11px;color:var(--text-dim);">
+                        Distribui posts pendentes nos horários disponíveis. Horários padrão: 09:00, 14:00, 19:00 (3/dia).
                     </div>
                 </div>
 
@@ -743,6 +780,36 @@
                                 Para migrar para um banco remoto no futuro, configure a variável de ambiente <code>DATABASE_URL</code>.
                             </span>
                         </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════════ TAB: HISTORY ════════ -->
+            <section id="tab-history" class="tab-content">
+                <div class="card">
+                    <div class="card-title">📊 Histórico de Publicações</div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;">
+                            <input type="text" id="historySearch" class="form-input" placeholder="Buscar por legenda, produto ou ID..." oninput="filterHistory()">
+                        </div>
+                        <div class="form-group">
+                            <select id="historyStatusFilter" class="form-input" onchange="filterHistory()">
+                                <option value="">Todos os status</option>
+                                <option value="PUBLICADO">Publicado</option>
+                                <option value="AGENDADO">Agendado</option>
+                                <option value="PENDENTE">Pendente</option>
+                                <option value="ERRO">Erro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-sm btn-ghost" onclick="loadHistory()">↻ Atualizar</button>
+                        </div>
+                    </div>
+                    <div class="queue-list" id="historyList" style="max-height:500px;">
+                        <div class="queue-placeholder">
+                            <span class="placeholder-icon">📊</span>
+                            Carregando histórico...
+                        </div>
                     </div>
                 </div>
             </section>

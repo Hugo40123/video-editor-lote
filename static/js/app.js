@@ -62,6 +62,7 @@ function switchTab(tab) {
     if (tab === 'content') { loadPostQueue(); }
     if (tab === 'products') { loadLinkedProducts(); updateProductPostSelect(); loadAffiliateIds(); }
     if (tab === 'settings') { loadQueueStats(); checkFfmpeg(); loadSettings(); }
+    if (tab === 'history') { loadHistory(); }
 }
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
@@ -559,6 +560,7 @@ async function startProcessing() {
                 delogo_y: +g('delogoY')||860,
                 delogo_width: +g('delogoWidth')||700,
                 delogo_height: +g('delogoHeight')||160,
+                generate_cover_frame: cb('generateCoverFrame'),
             }),
         });
         STATE.processingTaskId = d.task_id;
@@ -892,6 +894,22 @@ function selectContentItem(idx) {
     document.getElementById('contentCta').value = item.content_cta || '';
     document.getElementById('contentHashtags').value = item.content_hashtags || '';
     document.getElementById('contentCaption').value = item.caption || '';
+    loadContentThumbnail(item.video_path);
+}
+
+async function loadContentThumbnail(videoPath) {
+    const container = document.getElementById('contentThumbnail');
+    const img = document.getElementById('contentThumbImg');
+    if (!videoPath) { container.style.display = 'none'; return; }
+    try {
+        const d = await api('/api/editor/thumbnail', { method: 'POST', body: JSON.stringify({ video_path: videoPath }) });
+        if (d.thumbnail) {
+            img.src = d.thumbnail;
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    } catch { container.style.display = 'none'; }
 }
 
 async function importOutputVideos() {
@@ -1278,6 +1296,7 @@ async function loadSettings() {
         if (s.apply_watermark !== undefined) document.getElementById('applyLogo').checked = s.apply_watermark === true || s.apply_watermark === 'true';
         if (s.apply_text_watermark !== undefined) document.getElementById('applyTextMark').checked = s.apply_text_watermark === true || s.apply_text_watermark === 'true';
         if (s.remove_center_watermark !== undefined) document.getElementById('removeWatermark').checked = s.remove_center_watermark === true || s.remove_center_watermark === 'true';
+        if (s.generate_cover_frame !== undefined) document.getElementById('generateCoverFrame').checked = s.generate_cover_frame === true || s.generate_cover_frame === 'true';
 
         // Background and logo images
         if (s.background_image) {
@@ -1330,6 +1349,7 @@ async function saveSettingsToServer() {
                 delogo_width: +g('delogoWidth') || 700,
                 delogo_height: +g('delogoHeight') || 160,
                 max_duration: g('maxDuration'),
+                generate_cover_frame: cb('generateCoverFrame'),
                 // Image paths
                 background_image: STATE.uploadedBgImage ? STATE.uploadedBgImage.server_path : '',
                 logo_image: STATE.uploadedLogoImage ? STATE.uploadedLogoImage.server_path : '',
@@ -1391,6 +1411,20 @@ async function schedulerStop() {
         await api('/api/posts/scheduler/stop', { method: 'POST' });
         toast('Scheduler parado.', 'info');
         loadSchedulerStatus();
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
+}
+
+async function smartSchedule() {
+    const postsPerDay = +g('smartPostsPerDay') || 3;
+    const startDate = g('smartStartDate') || '';
+    try {
+        const d = await api('/api/posts/smart-schedule', {
+            method: 'POST',
+            body: JSON.stringify({ posts_per_day: postsPerDay, start_date: startDate }),
+        });
+        toast(d.message || `${d.scheduled} posts agendados.`, 'success');
+        loadPostQueue();
+        loadDashboardStats();
     } catch (err) { toast('Erro: ' + err.message, 'error'); }
 }
 
@@ -1790,4 +1824,62 @@ function toggleCollapse(btn) {
     } else {
         btn.textContent = btn.textContent.replace('\u25B2', '\u25BC');
     }
+}
+
+// ─── History Tab ──────────────────────────────────────────────────────────────
+let historyData = [];
+
+async function loadHistory() {
+    try {
+        const posts = await api('/api/posts');
+        historyData = posts || [];
+        renderHistory(historyData);
+    } catch {}
+}
+
+function filterHistory() {
+    const search = (g('historySearch') || '').toLowerCase();
+    const statusFilter = g('historyStatusFilter');
+    let filtered = historyData;
+    if (statusFilter) {
+        filtered = filtered.filter(p => p.status === statusFilter);
+    }
+    if (search) {
+        filtered = filtered.filter(p =>
+            (p.caption || '').toLowerCase().includes(search) ||
+            (p.video_path || '').toLowerCase().includes(search) ||
+            (p.instagram_post_id || '').toLowerCase().includes(search) ||
+            (p.product_query || '').toLowerCase().includes(search)
+        );
+    }
+    renderHistory(filtered);
+}
+
+function renderHistory(items) {
+    const list = document.getElementById('historyList');
+    if (!items?.length) {
+        list.innerHTML = '<div class="queue-placeholder"><span class="placeholder-icon">📊</span>Nenhum item no histórico.</div>';
+        return;
+    }
+    list.innerHTML = items.map(item => {
+        const name = item.video_path?.split(/[/\\\\]/).pop() || 'video';
+        const st = item.status || 'PENDENTE';
+        const scheduled = item.scheduled_for ? `Agendado: ${item.scheduled_for}` : '';
+        const published = item.published_at ? `Publicado: ${item.published_at}` : '';
+        const igId = item.instagram_post_id ? `IG: ${item.instagram_post_id}` : '';
+        const caption = item.caption ? item.caption.substring(0, 120) + (item.caption.length > 120 ? '...' : '') : '';
+        return `<div class="queue-item" style="flex-direction:column;align-items:flex-start;gap:6px;padding:12px;">
+            <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+                <span class="queue-item-name" style="font-weight:600;">${name}</span>
+                <span class="queue-item-status ${st.toLowerCase()}">${st}</span>
+            </div>
+            ${caption ? `<div style="font-size:12px;color:var(--text-secondary);line-height:1.4;">${caption}</div>` : ''}
+            <div style="font-size:11px;color:var(--text-dim);display:flex;gap:12px;flex-wrap:wrap;">
+                ${scheduled ? `<span>⏰ ${scheduled}</span>` : ''}
+                ${published ? `<span>✅ ${published}</span>` : ''}
+                ${igId ? `<span>📱 ${igId}</span>` : ''}
+                ${item.product_query ? `<span>🔍 ${item.product_query}</span>` : ''}
+            </div>
+        </div>`;
+    }).join('');
 }

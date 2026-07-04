@@ -65,6 +65,7 @@ class ProcessRequest(BaseModel):
     delogo_y: int = 860
     delogo_width: int = 700
     delogo_height: int = 160
+    generate_cover_frame: bool = False
 
     class Config:
         protected_namespaces = ()
@@ -318,6 +319,7 @@ async def start_processing(req: ProcessRequest) -> dict[str, Any]:
         delogo_width=req.delogo_width,
         delogo_height=req.delogo_height,
         ffmpeg_executable=executable,
+        generate_cover_frame=req.generate_cover_frame,
     )
 
     task_id = uuid.uuid4().hex

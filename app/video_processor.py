@@ -79,6 +79,7 @@ class RenderOptions:
     delogo_width: int = 700
     delogo_height: int = 160
     ffmpeg_executable: str = "ffmpeg"
+    generate_cover_frame: bool = False
 
 
 @dataclass
@@ -87,6 +88,7 @@ class ProcessSummary:
     successes: int = 0
     failures: int = 0
     output_files: list[Path] = field(default_factory=list)
+    cover_frames: list[Path] = field(default_factory=list)
 
 
 LogCallback = Callable[[str], None]
@@ -131,6 +133,13 @@ def process_videos(
             summary.successes += 1
             summary.output_files.append(output_file)
             _log(log_callback, f"Concluído: {output_file.name}")
+
+            # Generate cover frame if enabled
+            if options.generate_cover_frame:
+                cover_path = _generate_cover_frame(input_video, output_file, options.ffmpeg_executable)
+                if cover_path:
+                    summary.cover_frames.append(cover_path)
+                    _log(log_callback, f"Capa gerada: {cover_path.name}")
         else:
             summary.failures += 1
             stderr = result.stderr.strip() or "FFmpeg não retornou detalhes do erro."
@@ -344,6 +353,37 @@ def _clamp_delogo_area(x: int, y: int, width: int, height: int) -> tuple[int, in
     width = max(2, min(width, CANVAS_WIDTH - x))
     height = max(2, min(height, CANVAS_HEIGHT - y))
     return x, y, width, height
+
+
+def _generate_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> Path | None:
+    """Generate a cover frame from the input video (first second)."""
+    try:
+        cover_path = output_video.with_suffix(".jpg")
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-hide_banner",
+                "-ss",
+                "00:00:01",
+                "-i",
+                str(input_video),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "2",
+                str(cover_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and cover_path.is_file() and cover_path.stat().st_size > 0:
+            return cover_path
+        cover_path.unlink(missing_ok=True)
+        return None
+    except Exception:
+        return None
 
 
 def _log(callback: LogCallback | None, message: str) -> None:
