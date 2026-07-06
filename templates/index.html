@@ -116,6 +116,13 @@
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="generateCoverFrame"> Gerar capa
                                 </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="roundedCorners" onchange="toggleCornerRadius()"> Bordas arredondadas
+                                </label>
+                            </div>
+                            <div class="form-group" id="cornerRadiusGroup" style="display:none;">
+                                <label>Raio das bordas <span id="cornerRadiusVal">30</span>px</label>
+                                <input type="range" id="cornerRadius" min="5" max="100" value="30" oninput="document.getElementById('cornerRadiusVal').textContent=this.value">
                             </div>
                         </div>
 

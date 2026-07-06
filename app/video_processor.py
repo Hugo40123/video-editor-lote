@@ -80,6 +80,8 @@ class RenderOptions:
     delogo_height: int = 160
     ffmpeg_executable: str = "ffmpeg"
     generate_cover_frame: bool = False
+    rounded_corners: bool = False
+    corner_radius: int = 30
 
 
 @dataclass
@@ -88,7 +90,6 @@ class ProcessSummary:
     successes: int = 0
     failures: int = 0
     output_files: list[Path] = field(default_factory=list)
-    cover_frames: list[Path] = field(default_factory=list)
 
 
 LogCallback = Callable[[str], None]
@@ -134,12 +135,11 @@ def process_videos(
             summary.output_files.append(output_file)
             _log(log_callback, f"Concluído: {output_file.name}")
 
-            # Generate cover frame if enabled
+            # Prepend cover frame to video if enabled
             if options.generate_cover_frame:
-                cover_path = _generate_cover_frame(input_video, output_file, options.ffmpeg_executable)
-                if cover_path:
-                    summary.cover_frames.append(cover_path)
-                    _log(log_callback, f"Capa gerada: {cover_path.name}")
+                success = _prepend_cover_frame(input_video, output_file, options.ffmpeg_executable)
+                if success:
+                    _log(log_callback, f"Capa inserida no início do vídeo.")
         else:
             summary.failures += 1
             stderr = result.stderr.strip() or "FFmpeg não retornou detalhes do erro."
@@ -275,6 +275,22 @@ def build_filter_complex(options: RenderOptions, config: TemplateConfig) -> str:
         current_label = next_label
         stage += 1
 
+    # Rounded corners on the main video overlay
+    if options.rounded_corners and options.corner_radius > 0:
+        next_label = f"stage{stage}"
+        r = options.corner_radius
+        filters.append(
+            f"[{current_label}]geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':"
+            f"alpha='if(lt(abs(X-W/2),W/2-{r})*lt(abs(Y-H/2),H/2-{r}),255,"
+            f"if(lt(hypot(abs(X-W/2)-(W/2-{r}),abs(Y-H/2)),{r}),255,"
+            f"if(lt(hypot(abs(X-W/2)-(W/2-{r}),abs(Y-H/2)-(H/2-{r})),{r}),255,"
+            f"if(lt(hypot(abs(X-W/2)+(W/2-{r}),abs(Y-H/2)),{r}),255,"
+            f"if(lt(hypot(abs(X-W/2)+(W/2-{r}),abs(Y-H/2)-(H/2-{r})),{r}),255,0)))))'"
+            f"[{next_label}]"
+        )
+        current_label = next_label
+        stage += 1
+
     filters.append(f"[{current_label}]format=yuv420p[outv]")
     return ";".join(filters)
 
@@ -355,35 +371,63 @@ def _clamp_delogo_area(x: int, y: int, width: int, height: int) -> tuple[int, in
     return x, y, width, height
 
 
-def _generate_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> Path | None:
-    """Generate a cover frame from the input video (first second)."""
+def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> bool:
+    """Extract first frame and prepend it as a 2-second cover to the output video."""
+    import tempfile
     try:
-        cover_path = output_video.with_suffix(".jpg")
+        # Extract first frame as image
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_img:
+            img_path = tmp_img.name
+
         result = subprocess.run(
-            [
-                ffmpeg,
-                "-y",
-                "-hide_banner",
-                "-ss",
-                "00:00:01",
-                "-i",
-                str(input_video),
-                "-frames:v",
-                "1",
-                "-q:v",
-                "2",
-                str(cover_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
+            [ffmpeg, "-y", "-hide_banner", "-ss", "00:00:00.5",
+             "-i", str(input_video), "-frames:v", "1", "-q:v", "2", img_path],
+            capture_output=True, text=True, timeout=30,
         )
-        if result.returncode == 0 and cover_path.is_file() and cover_path.stat().st_size > 0:
-            return cover_path
-        cover_path.unlink(missing_ok=True)
-        return None
+        if result.returncode != 0 or not Path(img_path).is_file():
+            return False
+
+        # Create 2-second video from the frame
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_vid:
+            cover_video = tmp_vid.name
+
+        result = subprocess.run(
+            [ffmpeg, "-y", "-hide_banner", "-loop", "1", "-i", img_path,
+             "-t", "2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-pix_fmt", "yuv420p", "-r", "30", cover_video],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0 or not Path(cover_video).is_file():
+            Path(img_path).unlink(missing_ok=True)
+            return False
+
+        # Create concat list
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write(f"file '{cover_video}'\n")
+            f.write(f"file '{output_video.resolve().as_posix()}'\n")
+            concat_list = f.name
+
+        # Concat cover + original video
+        temp_output = output_video.with_suffix(".tmp.mp4")
+        result = subprocess.run(
+            [ffmpeg, "-y", "-hide_banner", "-f", "concat", "-safe", "0",
+             "-i", concat_list, "-c", "copy", str(temp_output)],
+            capture_output=True, text=True, timeout=300,
+        )
+
+        # Cleanup
+        Path(img_path).unlink(missing_ok=True)
+        Path(cover_video).unlink(missing_ok=True)
+        Path(concat_list).unlink(missing_ok=True)
+
+        if result.returncode == 0 and temp_output.is_file():
+            temp_output.replace(output_video)
+            return True
+        else:
+            temp_output.unlink(missing_ok=True)
+            return False
     except Exception:
-        return None
+        return False
 
 
 def _log(callback: LogCallback | None, message: str) -> None:

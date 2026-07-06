@@ -561,6 +561,8 @@ async function startProcessing() {
                 delogo_width: +g('delogoWidth')||700,
                 delogo_height: +g('delogoHeight')||160,
                 generate_cover_frame: cb('generateCoverFrame'),
+                rounded_corners: cb('roundedCorners'),
+                corner_radius: +g('cornerRadius')||30,
             }),
         });
         STATE.processingTaskId = d.task_id;
@@ -659,6 +661,11 @@ function toggleAiProvider() {
     const provider = g('aiProvider');
     document.getElementById('groqConfig').style.display = provider === 'groq' ? 'block' : 'none';
     document.getElementById('geminiConfig').style.display = provider === 'gemini' ? 'block' : 'none';
+}
+
+function toggleCornerRadius() {
+    const show = cb('roundedCorners');
+    document.getElementById('cornerRadiusGroup').style.display = show ? 'block' : 'none';
 }
 
 // ─── Groq Settings ──────────────────────────────────────────────────────────
@@ -945,6 +952,11 @@ async function generateLocalContent() {
 }
 
 async function generateAIContent() {
+    // Check if batch items are selected
+    if (STATE.batchSelected.size > 0) {
+        generateBatchContent();
+        return;
+    }
     if (STATE.selectedContentIdx === null) { toast('Selecione um video da fila.', 'warning'); return; }
     const item = STATE.postQueue[STATE.selectedContentIdx];
     if (!item?.video_path) { toast('Item invalido.', 'error'); return; }
@@ -987,6 +999,8 @@ async function generateAIContent() {
             document.getElementById('contentCaption').value = d.caption || '';
             logLine(log, 'Conteudo gerado com Groq!', 'success');
             toast('Conteudo gerado com Groq!', 'success');
+            // Auto-save to server
+            await saveContent();
         } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); toast('Erro: ' + err.message, 'error'); }
     } else {
         // Gemini
@@ -1023,6 +1037,8 @@ async function generateAIContent() {
             document.getElementById('contentCaption').value = d.caption || '';
             logLine(log, 'Conteudo gerado com Gemini!', 'success');
             toast('Conteudo gerado com Gemini!', 'success');
+            // Auto-save to server
+            await saveContent();
         } catch (err) { logLine(log, `Erro: ${err.message}`, 'error'); toast('Erro: ' + err.message, 'error'); }
     }
 }
@@ -1297,6 +1313,11 @@ async function loadSettings() {
         if (s.apply_text_watermark !== undefined) document.getElementById('applyTextMark').checked = s.apply_text_watermark === true || s.apply_text_watermark === 'true';
         if (s.remove_center_watermark !== undefined) document.getElementById('removeWatermark').checked = s.remove_center_watermark === true || s.remove_center_watermark === 'true';
         if (s.generate_cover_frame !== undefined) document.getElementById('generateCoverFrame').checked = s.generate_cover_frame === true || s.generate_cover_frame === 'true';
+        if (s.rounded_corners !== undefined) {
+            document.getElementById('roundedCorners').checked = s.rounded_corners === true || s.rounded_corners === 'true';
+            toggleCornerRadius();
+        }
+        if (s.corner_radius) document.getElementById('cornerRadius').value = s.corner_radius;
 
         // Background and logo images
         if (s.background_image) {
@@ -1350,6 +1371,8 @@ async function saveSettingsToServer() {
                 delogo_height: +g('delogoHeight') || 160,
                 max_duration: g('maxDuration'),
                 generate_cover_frame: cb('generateCoverFrame'),
+                rounded_corners: cb('roundedCorners'),
+                corner_radius: +g('cornerRadius') || 30,
                 // Image paths
                 background_image: STATE.uploadedBgImage ? STATE.uploadedBgImage.server_path : '',
                 logo_image: STATE.uploadedLogoImage ? STATE.uploadedLogoImage.server_path : '',
