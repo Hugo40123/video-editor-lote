@@ -275,21 +275,9 @@ def build_filter_complex(options: RenderOptions, config: TemplateConfig) -> str:
         current_label = next_label
         stage += 1
 
-    # Rounded corners on the main video overlay
-    if options.rounded_corners and options.corner_radius > 0:
-        next_label = f"stage{stage}"
-        r = options.corner_radius
-        filters.append(
-            f"[{current_label}]geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':"
-            f"alpha='if(lt(abs(X-W/2),W/2-{r})*lt(abs(Y-H/2),H/2-{r}),255,"
-            f"if(lt(hypot(abs(X-W/2)-(W/2-{r}),abs(Y-H/2)),{r}),255,"
-            f"if(lt(hypot(abs(X-W/2)-(W/2-{r}),abs(Y-H/2)-(H/2-{r})),{r}),255,"
-            f"if(lt(hypot(abs(X-W/2)+(W/2-{r}),abs(Y-H/2)),{r}),255,"
-            f"if(lt(hypot(abs(X-W/2)+(W/2-{r}),abs(Y-H/2)-(H/2-{r})),{r}),255,0)))))'"
-            f"[{next_label}]"
-        )
-        current_label = next_label
-        stage += 1
+    # Rounded corners - disabled for now (complex FFmpeg filter)
+    # if options.rounded_corners and options.corner_radius > 0:
+    #     TODO: implement rounded corners with simpler approach
 
     filters.append(f"[{current_label}]format=yuv420p[outv]")
     return ";".join(filters)
