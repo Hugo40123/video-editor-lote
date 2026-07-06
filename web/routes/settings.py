@@ -51,15 +51,6 @@ async def update_settings(data: dict[str, str]) -> dict[str, Any]:
     return {"saved": True, "count": len(data)}
 
 
-# ─── Get single setting ───────────────────────────────────────────────────────
-
-
-@router.get("/{key}")
-async def read_setting(key: str) -> dict[str, str]:
-    value = get_setting(key)
-    return {"key": key, "value": value}
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # EDITOR PRESETS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -85,7 +76,6 @@ async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
     if not name:
         return {"error": "Nome do preset e obrigatorio."}
 
-    # Get current editor settings
     preset_data = {
         "video_template": data.get("video_template", ""),
         "video_size": data.get("video_size", 100),
@@ -109,14 +99,12 @@ async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
         "max_duration": data.get("max_duration", ""),
     }
 
-    # Load existing presets
     raw = get_setting("editor_presets")
     try:
         presets = json.loads(raw) if raw else []
     except (json.JSONDecodeError, TypeError):
         presets = []
 
-    # Check if name already exists, update it
     found = False
     for i, p in enumerate(presets):
         if p.get("name") == name:
@@ -127,9 +115,7 @@ async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
     if not found:
         presets.append({"name": name, "data": preset_data})
 
-    # Save back
     set_setting("editor_presets", json.dumps(presets))
-
     return {"saved": True, "name": name, "total": len(presets)}
 
 
@@ -170,8 +156,18 @@ async def delete_preset(name: str) -> dict[str, Any]:
 
     presets = [p for p in presets if p.get("name") != name]
     set_setting("editor_presets", json.dumps(presets))
-
     return {"deleted": True, "name": name, "total": len(presets)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SINGLE SETTING (MUST BE LAST - catches all)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/{key}")
+async def read_setting(key: str) -> dict[str, str]:
+    value = get_setting(key)
+    return {"key": key, "value": value}
 
 
 # ─── Debug Instagram Connection ────────────────────────────────────────────────
