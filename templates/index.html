@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VideoEditorLote</title>
-    <link rel="stylesheet" href="/static/css/app.css?v=11">
+    <link rel="stylesheet" href="/static/css/app.css?v=12">
 </head>
 <body>
 
@@ -101,6 +101,21 @@
                             <div class="form-group">
                                 <label>📐 Template</label>
                                 <select id="templateSelect" class="form-input"></select>
+                            </div>
+                        </div>
+
+                        <!-- ═══ Presets ═══ -->
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label>💾 Presets de edição</label>
+                                <div style="display:flex;gap:8px;">
+                                    <select id="presetSelect" class="form-input" style="flex:1;" onchange="loadPreset()">
+                                        <option value="">Selecionar preset...</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-ghost" onclick="refreshPresets()">↻</button>
+                                    <button class="btn btn-sm btn-primary" onclick="savePreset()">💾 Salvar</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deletePreset()">🗑️</button>
+                                </div>
                             </div>
                         </div>
 
@@ -825,6 +840,6 @@
     </div><!-- /main-area -->
 </div><!-- /app-layout -->
 
-<script src="/static/js/app.js?v=14"></script>
+<script src="/static/js/app.js?v=15"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter
@@ -57,6 +58,120 @@ async def update_settings(data: dict[str, str]) -> dict[str, Any]:
 async def read_setting(key: str) -> dict[str, str]:
     value = get_setting(key)
     return {"key": key, "value": value}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EDITOR PRESETS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/presets/list")
+async def list_presets() -> dict[str, Any]:
+    """List all saved editor presets."""
+    raw = get_setting("editor_presets")
+    if not raw:
+        return {"presets": []}
+    try:
+        presets = json.loads(raw)
+        return {"presets": presets}
+    except (json.JSONDecodeError, TypeError):
+        return {"presets": []}
+
+
+@router.post("/presets/save")
+async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
+    """Save a new editor preset with a name."""
+    name = (data.get("name") or "").strip()
+    if not name:
+        return {"error": "Nome do preset e obrigatorio."}
+
+    # Get current editor settings
+    preset_data = {
+        "video_template": data.get("video_template", ""),
+        "video_size": data.get("video_size", 100),
+        "video_width": data.get("video_width", 100),
+        "video_offset_x": data.get("video_offset_x", 0),
+        "video_offset_y": data.get("video_offset_y", 0),
+        "apply_watermark": data.get("apply_watermark", False),
+        "apply_text_watermark": data.get("apply_text_watermark", False),
+        "text_watermark": data.get("text_watermark", ""),
+        "text_watermark_size": data.get("text_watermark_size", 76),
+        "text_watermark_offset_x": data.get("text_watermark_offset_x", 0),
+        "text_watermark_offset_y": data.get("text_watermark_offset_y", 0),
+        "remove_center_watermark": data.get("remove_center_watermark", False),
+        "delogo_x": data.get("delogo_x", 190),
+        "delogo_y": data.get("delogo_y", 860),
+        "delogo_width": data.get("delogo_width", 700),
+        "delogo_height": data.get("delogo_height", 160),
+        "generate_cover_frame": data.get("generate_cover_frame", False),
+        "rounded_corners": data.get("rounded_corners", False),
+        "corner_radius": data.get("corner_radius", 30),
+        "max_duration": data.get("max_duration", ""),
+    }
+
+    # Load existing presets
+    raw = get_setting("editor_presets")
+    try:
+        presets = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        presets = []
+
+    # Check if name already exists, update it
+    found = False
+    for i, p in enumerate(presets):
+        if p.get("name") == name:
+            presets[i] = {"name": name, "data": preset_data}
+            found = True
+            break
+
+    if not found:
+        presets.append({"name": name, "data": preset_data})
+
+    # Save back
+    set_setting("editor_presets", json.dumps(presets))
+
+    return {"saved": True, "name": name, "total": len(presets)}
+
+
+@router.post("/presets/load")
+async def load_preset(data: dict[str, str]) -> dict[str, Any]:
+    """Load a preset by name and return its settings."""
+    name = (data.get("name") or "").strip()
+    if not name:
+        return {"error": "Nome do preset e obrigatorio."}
+
+    raw = get_setting("editor_presets")
+    if not raw:
+        return {"error": "Nenhum preset salvo."}
+
+    try:
+        presets = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {"error": "Erro ao ler presets."}
+
+    for p in presets:
+        if p.get("name") == name:
+            return {"preset": p.get("data", {}), "name": name}
+
+    return {"error": f"Preset '{name}' nao encontrado."}
+
+
+@router.delete("/presets/{name}")
+async def delete_preset(name: str) -> dict[str, Any]:
+    """Delete a preset by name."""
+    raw = get_setting("editor_presets")
+    if not raw:
+        return {"error": "Nenhum preset salvo."}
+
+    try:
+        presets = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {"error": "Erro ao ler presets."}
+
+    presets = [p for p in presets if p.get("name") != name]
+    set_setting("editor_presets", json.dumps(presets))
+
+    return {"deleted": True, "name": name, "total": len(presets)}
 
 
 # ─── Debug Instagram Connection ────────────────────────────────────────────────

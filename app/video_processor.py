@@ -372,7 +372,7 @@ def _clamp_delogo_area(x: int, y: int, width: int, height: int) -> tuple[int, in
 
 
 def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> bool:
-    """Extract first frame and prepend it as a 2-second cover to the output video."""
+    """Extract first frame and prepend it as a 1-second cover to the output video."""
     import tempfile
     try:
         # Extract first frame as image
@@ -387,13 +387,13 @@ def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> 
         if result.returncode != 0 or not Path(img_path).is_file():
             return False
 
-        # Create 2-second video from the frame
+        # Create 1-second video from the frame
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_vid:
             cover_video = tmp_vid.name
 
         result = subprocess.run(
             [ffmpeg, "-y", "-hide_banner", "-loop", "1", "-i", img_path,
-             "-t", "2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-t", "1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
              "-pix_fmt", "yuv420p", "-r", "30", cover_video],
             capture_output=True, text=True, timeout=30,
         )

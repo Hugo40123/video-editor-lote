@@ -58,6 +58,7 @@ function switchTab(tab) {
     const el = document.getElementById(`tab-${tab}`);
     if (el) el.classList.add('active');
     STATE.tab = tab;
+    if (tab === 'editor') { refreshPresets(); }
     if (tab === 'posts') { loadPostQueue(); loadOutputVideos(); loadDashboardStats(); }
     if (tab === 'content') { loadPostQueue(); }
     if (tab === 'products') { loadLinkedProducts(); updateProductPostSelect(); loadAffiliateIds(); }
@@ -1836,6 +1837,100 @@ async function loadAffiliateIds() {
         if (s.shopee_affiliate_id) document.getElementById('shopeeAffiliateId').value = s.shopee_affiliate_id;
         if (s.shopee_sub_id) document.getElementById('shopeeSubId').value = s.shopee_sub_id;
     } catch {}
+}
+
+// ─── Editor Presets ──────────────────────────────────────────────────────────
+async function refreshPresets() {
+    try {
+        const d = await api('/api/settings/presets/list');
+        const sel = document.getElementById('presetSelect');
+        sel.innerHTML = '<option value="">Selecionar preset...</option>';
+        (d.presets || []).forEach(p => {
+            sel.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        });
+    } catch {}
+}
+
+async function savePreset() {
+    const name = prompt('Nome do preset:');
+    if (!name || !name.trim()) return;
+    try {
+        await api('/api/settings/presets/save', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name.trim(),
+                video_template: g('templateSelect'),
+                video_size: +g('videoSize') || 100,
+                video_width: +g('videoWidth') || 100,
+                video_offset_x: +g('videoOffsetX') || 0,
+                video_offset_y: +g('videoOffsetY') || 0,
+                apply_watermark: cb('applyLogo'),
+                apply_text_watermark: cb('applyTextMark'),
+                text_watermark: g('textMark'),
+                text_watermark_size: +g('textMarkSize') || 76,
+                text_watermark_offset_x: +g('textMarkOffsetX') || 0,
+                text_watermark_offset_y: +g('textMarkOffsetY') || 0,
+                remove_center_watermark: cb('removeWatermark'),
+                delogo_x: +g('delogoX') || 190,
+                delogo_y: +g('delogoY') || 860,
+                delogo_width: +g('delogoWidth') || 700,
+                delogo_height: +g('delogoHeight') || 160,
+                generate_cover_frame: cb('generateCoverFrame'),
+                rounded_corners: cb('roundedCorners'),
+                corner_radius: +g('cornerRadius') || 30,
+                max_duration: g('maxDuration'),
+            }),
+        });
+        toast(`Preset "${name.trim()}" salvo!`, 'success');
+        refreshPresets();
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
+}
+
+async function loadPreset() {
+    const name = g('presetSelect');
+    if (!name) return;
+    try {
+        const d = await api('/api/settings/presets/load', {
+            method: 'POST',
+            body: JSON.stringify({ name }),
+        });
+        if (d.error) { toast(d.error, 'error'); return; }
+        const p = d.preset;
+        if (p.video_template) document.getElementById('templateSelect').value = p.video_template;
+        if (p.video_size) document.getElementById('videoSize').value = p.video_size;
+        if (p.video_width) document.getElementById('videoWidth').value = p.video_width;
+        if (p.video_offset_x !== undefined) document.getElementById('videoOffsetX').value = p.video_offset_x;
+        if (p.video_offset_y !== undefined) document.getElementById('videoOffsetY').value = p.video_offset_y;
+        if (p.text_watermark) document.getElementById('textMark').value = p.text_watermark;
+        if (p.text_watermark_size) document.getElementById('textMarkSize').value = p.text_watermark_size;
+        if (p.text_watermark_offset_x !== undefined) document.getElementById('textMarkOffsetX').value = p.text_watermark_offset_x;
+        if (p.text_watermark_offset_y !== undefined) document.getElementById('textMarkOffsetY').value = p.text_watermark_offset_y;
+        if (p.delogo_x !== undefined) document.getElementById('delogoX').value = p.delogo_x;
+        if (p.delogo_y !== undefined) document.getElementById('delogoY').value = p.delogo_y;
+        if (p.delogo_width !== undefined) document.getElementById('delogoWidth').value = p.delogo_width;
+        if (p.delogo_height !== undefined) document.getElementById('delogoHeight').value = p.delogo_height;
+        if (p.max_duration) document.getElementById('maxDuration').value = p.max_duration;
+        if (p.corner_radius) document.getElementById('cornerRadius').value = p.corner_radius;
+        document.getElementById('applyLogo').checked = p.apply_watermark === true || p.apply_watermark === 'true';
+        document.getElementById('applyTextMark').checked = p.apply_text_watermark === true || p.apply_text_watermark === 'true';
+        document.getElementById('removeWatermark').checked = p.remove_center_watermark === true || p.remove_center_watermark === 'true';
+        document.getElementById('generateCoverFrame').checked = p.generate_cover_frame === true || p.generate_cover_frame === 'true';
+        document.getElementById('roundedCorners').checked = p.rounded_corners === true || p.rounded_corners === 'true';
+        toggleCornerRadius();
+        schedulePreview();
+        toast(`Preset "${d.name}" carregado!`, 'success');
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
+}
+
+async function deletePreset() {
+    const name = g('presetSelect');
+    if (!name) { toast('Selecione um preset para remover.', 'warning'); return; }
+    if (!confirm(`Remover o preset "${name}"?`)) return;
+    try {
+        await api(`/api/settings/presets/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        toast(`Preset "${name}" removido.`, 'success');
+        refreshPresets();
+    } catch (err) { toast('Erro: ' + err.message, 'error'); }
 }
 
 // ─── Collapse ────────────────────────────────────────────────────────────────
