@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 import requests
 
 from app.repository import get_all_settings, get_setting, save_settings_bulk, set_setting
-from app.utils import load_settings, save_settings
+from app.utils import load_settings, save_settings, writable_root
 
 router = APIRouter()
+
+
+def _presets_dir() -> Path:
+    """Path to the presets folder."""
+    d = writable_root() / "config" / "presets"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 # ─── Get all settings ─────────────────────────────────────────────────────────
@@ -52,29 +61,35 @@ async def update_settings(data: dict[str, str]) -> dict[str, Any]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EDITOR PRESETS
+# EDITOR PRESETS (file-based in config/presets/)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 @router.get("/presets/list")
 async def list_presets() -> dict[str, Any]:
-    """List all saved editor presets."""
-    raw = get_setting("editor_presets")
-    if not raw:
-        return {"presets": []}
-    try:
-        presets = json.loads(raw)
-        return {"presets": presets}
-    except (json.JSONDecodeError, TypeError):
-        return {"presets": []}
+    """List all saved editor presets from config/presets/ folder."""
+    presets_dir = _presets_dir()
+    presets = []
+    for f in sorted(presets_dir.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            presets.append({"name": f.stem, "data": data})
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"presets": presets}
 
 
 @router.post("/presets/save")
 async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
-    """Save a new editor preset with a name."""
+    """Save a preset as a JSON file in config/presets/."""
     name = (data.get("name") or "").strip()
     if not name:
         return {"error": "Nome do preset e obrigatorio."}
+
+    # Sanitize filename
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in name).strip()
+    if not safe_name:
+        return {"error": "Nome invalido."}
 
     preset_data = {
         "video_template": data.get("video_template", ""),
@@ -99,64 +114,44 @@ async def save_preset(data: dict[str, Any]) -> dict[str, Any]:
         "max_duration": data.get("max_duration", ""),
     }
 
-    raw = get_setting("editor_presets")
-    try:
-        presets = json.loads(raw) if raw else []
-    except (json.JSONDecodeError, TypeError):
-        presets = []
+    filepath = _presets_dir() / f"{safe_name}.json"
+    filepath.write_text(json.dumps(preset_data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    found = False
-    for i, p in enumerate(presets):
-        if p.get("name") == name:
-            presets[i] = {"name": name, "data": preset_data}
-            found = True
-            break
-
-    if not found:
-        presets.append({"name": name, "data": preset_data})
-
-    set_setting("editor_presets", json.dumps(presets))
-    return {"saved": True, "name": name, "total": len(presets)}
+    return {"saved": True, "name": name, "file": str(filepath)}
 
 
 @router.post("/presets/load")
 async def load_preset(data: dict[str, str]) -> dict[str, Any]:
-    """Load a preset by name and return its settings."""
+    """Load a preset by name from config/presets/ folder."""
     name = (data.get("name") or "").strip()
     if not name:
         return {"error": "Nome do preset e obrigatorio."}
 
-    raw = get_setting("editor_presets")
-    if not raw:
-        return {"error": "Nenhum preset salvo."}
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in name).strip()
+    filepath = _presets_dir() / f"{safe_name}.json"
+
+    if not filepath.is_file():
+        return {"error": f"Preset '{name}' nao encontrado."}
 
     try:
-        presets = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {"error": "Erro ao ler presets."}
-
-    for p in presets:
-        if p.get("name") == name:
-            return {"preset": p.get("data", {}), "name": name}
-
-    return {"error": f"Preset '{name}' nao encontrado."}
+        preset_data = json.loads(filepath.read_text(encoding="utf-8"))
+        return {"preset": preset_data, "name": name}
+    except (json.JSONDecodeError, OSError) as e:
+        return {"error": f"Erro ao ler preset: {e}"}
 
 
 @router.delete("/presets/{name}")
 async def delete_preset(name: str) -> dict[str, Any]:
-    """Delete a preset by name."""
-    raw = get_setting("editor_presets")
-    if not raw:
-        return {"error": "Nenhum preset salvo."}
+    """Delete a preset file from config/presets/."""
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in name).strip()
+    filepath = _presets_dir() / f"{safe_name}.json"
 
-    try:
-        presets = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return {"error": "Erro ao ler presets."}
+    if not filepath.is_file():
+        return {"error": f"Preset '{name}' nao encontrado."}
 
-    presets = [p for p in presets if p.get("name") != name]
-    set_setting("editor_presets", json.dumps(presets))
-    return {"deleted": True, "name": name, "total": len(presets)}
+    filepath.unlink()
+    remaining = len(list(_presets_dir().glob("*.json")))
+    return {"deleted": True, "name": name, "total": remaining}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
