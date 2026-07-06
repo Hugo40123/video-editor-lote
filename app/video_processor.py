@@ -275,9 +275,23 @@ def build_filter_complex(options: RenderOptions, config: TemplateConfig) -> str:
         current_label = next_label
         stage += 1
 
-    # Rounded corners - disabled for now (complex FFmpeg filter)
-    # if options.rounded_corners and options.corner_radius > 0:
-    #     TODO: implement rounded corners with simpler approach
+    # Rounded corners - using format=rgba + geq for alpha channel
+    if options.rounded_corners and options.corner_radius > 0:
+        next_label = f"stage{stage}"
+        r = min(options.corner_radius, 80)
+        # Apply rounded corners using alpha channel manipulation
+        filters.append(
+            f"[{current_label}]format=rgba,"
+            f"geq="
+            f"r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"
+            f"a='if("
+            f"gt(abs(X-(W/2)),(W/2)-{r})*gt(abs(Y-(H/2)),(H/2)-{r}),"
+            f"if(lt(hypot(abs(X-(W/2))-((W/2)-{r}),abs(Y-(H/2))),{r}),255,0),"
+            f"255'"
+            f")[{next_label}]"
+        )
+        current_label = next_label
+        stage += 1
 
     filters.append(f"[{current_label}]format=yuv420p[outv]")
     return ";".join(filters)
@@ -375,14 +389,16 @@ def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> 
         if result.returncode != 0 or not Path(img_path).is_file():
             return False
 
-        # Create 1-second video from the frame
+        # Create 1-second video from the frame WITH silent audio track
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_vid:
             cover_video = tmp_vid.name
 
         result = subprocess.run(
             [ffmpeg, "-y", "-hide_banner", "-loop", "1", "-i", img_path,
+             "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
              "-t", "1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-             "-pix_fmt", "yuv420p", "-r", "30", cover_video],
+             "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-shortest",
+             cover_video],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode != 0 or not Path(cover_video).is_file():
@@ -391,11 +407,11 @@ def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> 
 
         # Create concat list
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write(f"file '{cover_video}'\n")
+            f.write(f"file '{cover_video.resolve().as_posix()}'\n")
             f.write(f"file '{output_video.resolve().as_posix()}'\n")
             concat_list = f.name
 
-        # Concat cover + original video
+        # Concat cover + original video (both have audio tracks now)
         temp_output = output_video.with_suffix(".tmp.mp4")
         result = subprocess.run(
             [ffmpeg, "-y", "-hide_banner", "-f", "concat", "-safe", "0",
