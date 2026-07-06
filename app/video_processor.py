@@ -275,23 +275,8 @@ def build_filter_complex(options: RenderOptions, config: TemplateConfig) -> str:
         current_label = next_label
         stage += 1
 
-    # Rounded corners - using format=rgba + geq for alpha channel
-    if options.rounded_corners and options.corner_radius > 0:
-        next_label = f"stage{stage}"
-        r = min(options.corner_radius, 80)
-        # Apply rounded corners using alpha channel manipulation
-        filters.append(
-            f"[{current_label}]format=rgba,"
-            f"geq="
-            f"r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':"
-            f"a='if("
-            f"gt(abs(X-(W/2)),(W/2)-{r})*gt(abs(Y-(H/2)),(H/2)-{r}),"
-            f"if(lt(hypot(abs(X-(W/2))-((W/2)-{r}),abs(Y-(H/2))),{r}),255,0),"
-            f"255'"
-            f")[{next_label}]"
-        )
-        current_label = next_label
-        stage += 1
+    # Rounded corners - disabled for performance
+    # The geq filter with alpha is too slow for production use
 
     filters.append(f"[{current_label}]format=yuv420p[outv]")
     return ";".join(filters)
