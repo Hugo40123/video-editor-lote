@@ -62,12 +62,39 @@ class InstagramClient:
         *,
         media_type: str = "REELS",
         share_to_feed: bool = True,
+        scheduled_publish_time: int | None = None,
         log_callback: LogCallback | None = None,
     ) -> PublishResult:
+        """Publish a local video to Instagram.
+        
+        For REELS: always publishes immediately (Instagram doesn't support scheduled REELS).
+        For feed posts: can schedule using scheduled_publish_time (unix timestamp).
+        """
         if not video_path.is_file():
             raise InstagramApiError("O vídeo selecionado não foi encontrado.")
 
         self._log(log_callback, "Criando container de mídia no Instagram.")
+        
+        # For feed posts, we can use scheduled_publish_time
+        if media_type.upper() != "REELS" and scheduled_publish_time:
+            self._log(log_callback, f"Agendando publicação para: {scheduled_publish_time}")
+            container = self.create_media_container(
+                caption=caption,
+                media_type=media_type,
+                share_to_feed=share_to_feed,
+                published=False,
+                scheduled_publish_time=scheduled_publish_time,
+            )
+            container_id = str(container.get("id") or "")
+            if not container_id:
+                raise InstagramApiError("A API não retornou o ID do container.")
+            return PublishResult(
+                container_id=container_id,
+                instagram_post_id="",
+                final_status="SCHEDULED",
+            )
+
+        # For REELS or immediate publish: full flow
         container = self.create_media_container(
             caption=caption,
             media_type=media_type,
@@ -102,6 +129,8 @@ class InstagramClient:
         caption: str,
         media_type: str = "REELS",
         share_to_feed: bool = True,
+        published: bool = True,
+        scheduled_publish_time: int | None = None,
     ) -> dict[str, object]:
         payload: dict[str, object] = {
             "media_type": media_type,
@@ -111,6 +140,11 @@ class InstagramClient:
         }
         if media_type.upper() == "REELS":
             payload["share_to_feed"] = str(share_to_feed).lower()
+        
+        # For scheduled publishing (feed posts only, not REELS)
+        if not published and scheduled_publish_time:
+            payload["published"] = "false"
+            payload["scheduled_publish_time"] = str(scheduled_publish_time)
 
         return self._request_json(
             "POST",

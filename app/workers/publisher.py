@@ -46,12 +46,16 @@ def publish_post_to_instagram(
     api_version: str = DEFAULT_API_VERSION,
     media_type: str = "REELS",
     share_to_feed: bool = True,
+    scheduled_publish_time: int | None = None,
     log_callback: LogCallback | None = None,
 ) -> PublishResult:
     """Publish a post to Instagram.
 
     Can be called from the scheduler (auto) or from the manual publish endpoint.
     Reads credentials from DB if not provided explicitly.
+    
+    For feed posts: can schedule using scheduled_publish_time (unix timestamp).
+    For REELS: always publishes immediately (Instagram doesn't support scheduled REELS).
     """
     logs: list[str] = []
 
@@ -90,8 +94,24 @@ def publish_post_to_instagram(
             caption,
             media_type=media_type,
             share_to_feed=share_to_feed,
+            scheduled_publish_time=scheduled_publish_time,
             log_callback=_log,
         )
+
+        # If scheduled, keep status as AGENDADO
+        if result.final_status == "SCHEDULED":
+            update_post(
+                post_id,
+                status="AGENDADO",
+                last_error="",
+            )
+            _log(f"Scheduled on Instagram! Container ID: {result.container_id}")
+            return PublishResult(
+                success=True,
+                container_id=result.container_id,
+                final_status="SCHEDULED",
+                logs=logs,
+            )
 
         update_post(
             post_id,
