@@ -381,7 +381,7 @@ def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> 
         result = subprocess.run(
             [ffmpeg, "-y", "-hide_banner", "-loop", "1", "-i", img_path,
              "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-             "-t", "1", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
              "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-shortest",
              cover_video],
             capture_output=True, text=True, timeout=30,
@@ -404,12 +404,21 @@ def _prepend_cover_frame(input_video: Path, output_video: Path, ffmpeg: str) -> 
             capture_output=True, text=True, timeout=300,
         )
 
+        # If copy concat fails, try with re-encode
+        if result.returncode != 0 or not temp_output.is_file():
+            result = subprocess.run(
+                [ffmpeg, "-y", "-hide_banner", "-f", "concat", "-safe", "0",
+                 "-i", concat_list, "-c:v", "libx264", "-preset", "ultrafast",
+                 "-c:a", "aac", str(temp_output)],
+                capture_output=True, text=True, timeout=300,
+            )
+
         # Cleanup
         Path(img_path).unlink(missing_ok=True)
         Path(cover_video).unlink(missing_ok=True)
         Path(concat_list).unlink(missing_ok=True)
 
-        if result.returncode == 0 and temp_output.is_file():
+        if result.returncode == 0 and temp_output.is_file() and temp_output.stat().st_size > 0:
             temp_output.replace(output_video)
             return True
         else:

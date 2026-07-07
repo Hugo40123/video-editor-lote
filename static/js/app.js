@@ -1160,6 +1160,28 @@ async function savePostItem() {
     } catch { toast('Erro ao salvar.', 'error'); }
 }
 
+async function schedulePost() {
+    if (STATE.selectedPostIdx === null) { toast('Selecione um item.', 'warning'); return; }
+    const item = STATE.postQueue[STATE.selectedPostIdx];
+    if (!item?.id) return;
+    const scheduledFor = g('postScheduledFor');
+    if (!scheduledFor) { toast('Selecione data e hora.', 'warning'); return; }
+    try {
+        await api(`/api/posts/${item.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                status: 'AGENDADO',
+                scheduled_for: scheduledFor,
+                caption: document.getElementById('postCaption')?.value || '',
+            }),
+        });
+        document.getElementById('postStatus').value = 'AGENDADO';
+        toast('Agendado com sucesso!', 'success');
+        loadPostQueue();
+        loadDashboardStats();
+    } catch { toast('Erro ao agendar.', 'error'); }
+}
+
 async function removePostItem() {
     if (STATE.selectedPostIdx === null) { toast('Selecione um item.', 'warning'); return; }
     const item = STATE.postQueue[STATE.selectedPostIdx];

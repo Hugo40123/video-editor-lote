@@ -1,0 +1,22 @@
+{
+  "video_template": "Template 1: vídeo centralizado com fundo",
+  "video_size": 88,
+  "video_width": 140,
+  "video_offset_x": 0,
+  "video_offset_y": 258,
+  "apply_watermark": false,
+  "apply_text_watermark": true,
+  "text_watermark": "@achados.lauramendes",
+  "text_watermark_size": 26,
+  "text_watermark_offset_x": 0,
+  "text_watermark_offset_y": 365,
+  "remove_center_watermark": false,
+  "delogo_x": 190,
+  "delogo_y": 860,
+  "delogo_width": 700,
+  "delogo_height": 160,
+  "generate_cover_frame": true,
+  "rounded_corners": false,
+  "corner_radius": 30,
+  "max_duration": ""
+}

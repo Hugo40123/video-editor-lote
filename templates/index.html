@@ -474,7 +474,10 @@
                             </div>
                             <div class="form-group">
                                 <label>Agendar para</label>
-                                <input type="datetime-local" id="postScheduledFor" class="form-input">
+                                <div style="display:flex;gap:8px;">
+                                    <input type="datetime-local" id="postScheduledFor" class="form-input" style="flex:1;">
+                                    <button class="btn btn-sm btn-accent" onclick="schedulePost()">⏰ Agendar</button>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">
@@ -840,6 +843,6 @@
     </div><!-- /main-area -->
 </div><!-- /app-layout -->
 
-<script src="/static/js/app.js?v=15"></script>
+<script src="/static/js/app.js?v=16"></script>
 </body>
 </html>

@@ -358,10 +358,10 @@ async def smart_schedule(req: SmartScheduleRequest) -> dict[str, Any]:
             scheduled_dt = current_date.replace(hour=hour, minute=minute)
 
         # Update the post
-        update_post(post["id"], {
-            "status": "AGENDADO",
-            "scheduled_for": scheduled_dt.isoformat(timespec="minutes"),
-        })
+        update_post(post["id"],
+            status="AGENDADO",
+            scheduled_for=scheduled_dt.isoformat(timespec="minutes"),
+        )
         scheduled_count += 1
 
         # Move to next slot
